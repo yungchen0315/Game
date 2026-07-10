@@ -193,13 +193,25 @@ html, body {
 #restartBtn:active, #restartBtn:hover { background: linear-gradient(180deg,#5c4830,#3a2c1a); }
 
 #setupOverlay {
-  position: fixed; inset: 0; z-index: 60; overflow-y: auto;
+  position: fixed; inset: 0; z-index: 60;
   background: radial-gradient(circle at 50% 20%, #3b2a18, #0d0906 85%);
   color: var(--parchment);
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: clamp(10px, 3vh, 24px) 12px;
+  display: flex; flex-direction: column;
+}
+/* 選項內容（文明/對手/難度）自己滾動，「開始遊戲」按鈕固定在畫面最下方一律看得到、
+   點得到——避免手機橫向螢幕較矮時，選項一多按鈕就被捲到畫面外，看起來像卡住的畫面。 */
+#setupScroll {
+  flex: 1; overflow-y: auto; min-height: 0;
+  display: flex; justify-content: center;
+  padding: clamp(8px, 2.5vh, 20px) 12px;
 }
 #setupBox { width: min(720px, 100%); text-align: center; }
+#setupFooter {
+  flex-shrink: 0; display: flex; justify-content: center;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  border-top: 2px solid var(--gold);
+  background: rgba(13,9,6,0.9);
+}
 #setupBox h1 {
   font-size: clamp(22px, 4vh, 32px); color: var(--gold-bright); margin: 4px 0 clamp(10px, 2vh, 20px);
   text-shadow: 0 2px 6px rgba(0,0,0,0.6);
@@ -223,7 +235,7 @@ html, body {
 .setupOptTitle { font-weight: bold; color: var(--gold-bright); font-size: 14px; }
 .setupOptDesc { font-size: 11.5px; color: var(--parchment-dim); margin-top: 3px; line-height: 1.4; }
 #startGameBtn {
-  font-size: 17px; padding: 12px 40px; cursor: pointer; border-radius: 999px; margin-top: 8px;
+  font-size: 17px; padding: 12px 40px; cursor: pointer; border-radius: 999px; width: min(320px, 100%);
   border: 1px solid var(--gold); background: linear-gradient(180deg,#6b8a3a,#3a5322); color: var(--parchment);
   touch-action: manipulation; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
 }
@@ -260,20 +272,24 @@ html, body {
   </div>
 
   <div id="setupOverlay">
-    <div id="setupBox">
-      <h1>世紀爭霸</h1>
-      <div class="setupSection">
-        <div class="setupLabel">選擇你的文明</div>
-        <div id="civGrid" class="setupGrid"></div>
+    <div id="setupScroll">
+      <div id="setupBox">
+        <h1>世紀爭霸</h1>
+        <div class="setupSection">
+          <div class="setupLabel">選擇你的文明</div>
+          <div id="civGrid" class="setupGrid"></div>
+        </div>
+        <div class="setupSection">
+          <div class="setupLabel">電腦對手人數</div>
+          <div id="opponentGrid" class="setupGrid"></div>
+        </div>
+        <div class="setupSection">
+          <div class="setupLabel">難度</div>
+          <div id="difficultyGrid" class="setupGrid"></div>
+        </div>
       </div>
-      <div class="setupSection">
-        <div class="setupLabel">電腦對手人數</div>
-        <div id="opponentGrid" class="setupGrid"></div>
-      </div>
-      <div class="setupSection">
-        <div class="setupLabel">難度</div>
-        <div id="difficultyGrid" class="setupGrid"></div>
-      </div>
+    </div>
+    <div id="setupFooter">
       <button id="startGameBtn">開始遊戲</button>
     </div>
   </div>
@@ -2528,7 +2544,7 @@ function buildSetupOption(container, title, desc, selected, onClick) {
   const el = document.createElement('div');
   el.className = 'setupOption' + (selected ? ' selected' : '');
   el.innerHTML = `<div class="setupOptTitle">${title}</div>` + (desc ? `<div class="setupOptDesc">${desc}</div>` : '');
-  el.onclick = onClick;
+  onTap(el, onClick);
   container.appendChild(el);
 }
 
@@ -2563,7 +2579,7 @@ function showSetupScreen() {
   gameOverOverlay.classList.add('hidden');
 }
 
-startGameBtn.addEventListener('click', () => {
+onTap(startGameBtn, () => {
   setupOverlay.classList.add('hidden');
   initGame({ civKey: setupChoice.civKey, numOpponents: setupChoice.numOpponents, difficulty: setupChoice.difficulty });
 });
@@ -2609,6 +2625,24 @@ let gameSetup = { civKey: CIV_KEYS[0], numOpponents: 1, difficulty: 'normal' };
 let dragStart = null;
 let dragCurrent = null;
 let pointerWorld = { x: 0, y: 0 };
+
+// UI 按鈕統一用這個綁定，不要單獨依賴瀏覽器的 click 事件：
+// 部分手機瀏覽器/WebView 由原始 touchstart+touchend 合成 click 事件的時機不穩定，
+// 曾經造成「按了開始遊戲/建造按鈕卻完全沒反應，畫面卡住」的回報。
+// 直接在 touchend 處理並 preventDefault，同時保留 click 作為備援（用旗標避免兩邊都觸發）。
+function onTap(el, handler) {
+  let handledAt = 0;
+  el.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handledAt = Date.now();
+    handler(e);
+  }, { passive: false });
+  el.addEventListener('click', (e) => {
+    if (Date.now() - handledAt < 500) return;
+    handler(e);
+  });
+}
 
 function costText(cost) {
   return Object.entries(cost || {}).map(([k, v]) => `${k === 'wood' ? '木' : k === 'food' ? '食' : '金'}${v}`).join(' ');
@@ -2839,6 +2873,13 @@ function handleTapCommand(wx, wy) {
 
   if (hasCommandable && isCommandTarget) {
     commandAtPoint(wx, wy);
+    // 下完指令後，若剛剛點的是自己的農田，順便把選取切成該農田，
+    // 這樣底部面板會立刻顯示「有沒有村民耕作中／剩餘食物」，
+    // 不用先取消選取單位再點一次才能看到農田狀態。
+    if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.def.isFarm) {
+      selection = [pick.ref];
+    }
+    refreshUI();
     return;
   }
   if (pick && pick.kind !== 'resource') {
@@ -3079,8 +3120,8 @@ function showGameOver() {
   `;
   gameOverOverlay.classList.remove('hidden');
 }
-restartBtn.addEventListener('click', () => { showSetupScreen(); });
-placementCancelBtn.addEventListener('click', () => { placement = null; refreshUI(); });
+onTap(restartBtn, () => { showSetupScreen(); });
+onTap(placementCancelBtn, () => { placement = null; refreshUI(); });
 
 // ---- 地形材質：預先畫好一張可平鋪的草地紋理，避免每幀重畫雜訊 ----
 const groundPattern = (() => {
@@ -3708,7 +3749,9 @@ function drawFogOfWar() {
       const explored = map.explored[idx];
       const visible = map.visibleNow[idx];
       if (visible) continue;
-      ctx.fillStyle = explored ? 'rgba(6,10,4,0.55)' : 'rgba(4,7,3,0.96)';
+      // 已探索但目前不在視野內的地形，用比較淡、偏暖色調的暗紗取代死板的灰色，
+      // 看起來像「記憶中略暗的地形」而不是一塊突然冒出來的灰色陰影。
+      ctx.fillStyle = explored ? 'rgba(18,22,10,0.38)' : 'rgba(4,7,3,0.96)';
       ctx.fillRect(tx * TILE - camera.x, ty * TILE - camera.y, TILE + 1, TILE + 1);
     }
   }
@@ -3736,11 +3779,11 @@ function buildBuildingButtons(container) {
     const affordable = human.canAfford(def.cost);
     btn.className = 'actBtn' + (affordable ? '' : ' disabled');
     btn.innerHTML = `<div class="icon">${BUILD_ICON[type]}</div><div>${def.name}</div><div class="cost">${costText(def.cost)}</div>`;
-    btn.onclick = () => {
+    onTap(btn, () => {
       if (!human.canAfford(def.cost)) return;
       placement = { type };
       placementCancelBtn.style.display = 'block';
-    };
+    });
     container.appendChild(btn);
   }
 }
@@ -3760,7 +3803,7 @@ function trainButton(container, building, rootOrType, isRoot) {
   }
   const sameQueued = building.trainQueue.filter((q) => q.type === type).length;
   if (sameQueued > 0) btn.innerHTML += `<div class="queueBadge">${sameQueued}</div>`;
-  btn.onclick = () => { startTraining(human, building, type); refreshUI(); };
+  onTap(btn, () => { startTraining(human, building, type); refreshUI(); });
   container.appendChild(btn);
 }
 
@@ -3772,7 +3815,7 @@ function upgradeButton(container, building, upgradeKey) {
   const btn = document.createElement('div');
   btn.className = 'actBtn' + (affordable ? '' : ' disabled');
   btn.innerHTML = `<div class="icon">⬆️</div><div>${up.name}</div><div class="cost">${costText(up.cost)}</div>`;
-  btn.onclick = () => { startUnitUpgrade(human, building, upgradeKey); refreshUI(); };
+  onTap(btn, () => { startUnitUpgrade(human, building, upgradeKey); refreshUI(); });
   container.appendChild(btn);
 }
 
@@ -3785,7 +3828,7 @@ function techButton(container, building, key) {
   const btn = document.createElement('div');
   btn.className = 'actBtn' + (affordable ? '' : ' disabled');
   btn.innerHTML = `<div class="icon">🧪</div><div>${tech.name}</div><div class="cost">${costText(tech.cost)}</div>`;
-  btn.onclick = () => { startResearchTech(human, building, key); refreshUI(); };
+  onTap(btn, () => { startResearchTech(human, building, key); refreshUI(); });
   container.appendChild(btn);
 }
 
@@ -3804,7 +3847,7 @@ function buildAgeUpButton(container, building) {
     const ratio = 1 - human.ageResearch.timeLeft / human.ageResearch.total;
     btn.innerHTML += `<div class="miniProgress" style="width:${ratio * 100}%"></div>`;
   }
-  btn.onclick = () => { startAgeUp(human); refreshUI(); };
+  onTap(btn, () => { startAgeUp(human); refreshUI(); });
   container.appendChild(btn);
 }
 
@@ -3822,7 +3865,7 @@ function buildTradeButtons(container) {
     const canSell = (human.resources[r.type] || 0) >= MARKET_TRADE_AMOUNT;
     sellBtn.className = 'actBtn' + (canSell ? '' : ' disabled');
     sellBtn.innerHTML = `<div class="icon">${r.icon}➡️🪙</div><div>賣出${r.name}</div><div class="cost">換 ${Math.round(MARKET_TRADE_AMOUNT * marketSellRate(human))} 金</div>`;
-    sellBtn.onclick = () => { sellResource(human, r.type); refreshUI(); };
+    onTap(sellBtn, () => { sellResource(human, r.type); refreshUI(); });
     container.appendChild(sellBtn);
 
     const buyBtn = document.createElement('div');
@@ -3830,7 +3873,7 @@ function buildTradeButtons(container) {
     const canBuy = (human.resources.gold || 0) >= buyCost;
     buyBtn.className = 'actBtn' + (canBuy ? '' : ' disabled');
     buyBtn.innerHTML = `<div class="icon">🪙➡️${r.icon}</div><div>買入${r.name}</div><div class="cost">花 ${Math.round(buyCost)} 金</div>`;
-    buyBtn.onclick = () => { buyResource(human, r.type); refreshUI(); };
+    onTap(buyBtn, () => { buyResource(human, r.type); refreshUI(); });
     container.appendChild(buyBtn);
   }
 }
@@ -3843,7 +3886,7 @@ function buildGateToggleButton(container, building) {
   const btn = document.createElement('div');
   btn.className = 'actBtn';
   btn.innerHTML = `<div class="icon">${building.open ? '🔓' : '🔒'}</div><div>${building.open ? '關閉城門' : '開啟城門'}</div>`;
-  btn.onclick = () => { toggleGate(state.map, building); refreshUI(); };
+  onTap(btn, () => { toggleGate(state.map, building); refreshUI(); });
   container.appendChild(btn);
 }
 
@@ -3863,9 +3906,9 @@ function buildFarmWorkerButton(container, farm) {
   const candidate = myVillagers[0] || human.units.find((u) => u.stats.class === 'villager');
   btn.className = 'actBtn' + (candidate ? '' : ' disabled');
   btn.innerHTML = '<div class="icon">🧑‍🌾</div><div>指派村民耕作</div>';
-  btn.onclick = () => {
+  onTap(btn, () => {
     if (candidate) { issueFarmWork(state.map, candidate, farm); refreshUI(); }
-  };
+  });
   container.appendChild(btn);
 }
 
@@ -3883,7 +3926,7 @@ function buildStanceButtons(container, units) {
     const isSelected = units.every((u) => u.stance === m.key);
     btn.className = 'actBtn' + (isSelected ? ' selectedStance' : '');
     btn.innerHTML = `<div class="icon">${m.icon}</div><div>${m.name}</div>`;
-    btn.onclick = () => { for (const u of units) u.stance = m.key; refreshUI(); };
+    onTap(btn, () => { for (const u of units) u.stance = m.key; refreshUI(); });
     container.appendChild(btn);
   }
 }

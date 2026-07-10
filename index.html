@@ -4,7 +4,68 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>世紀爭霸</title>
-<link rel="stylesheet" href="style.css" />
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; }
+
+#game { position: fixed; inset: 0; display: block; background: #3a5f2b; cursor: default; }
+
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 44px;
+  background: rgba(20, 20, 24, 0.92); color: #f0e6d2;
+  display: flex; align-items: center; gap: 18px; padding: 0 14px;
+  font-size: 15px; z-index: 20; border-bottom: 2px solid #5a4a2a;
+}
+#topbar .res { display: flex; align-items: center; gap: 4px; min-width: 54px; }
+#topbar .icon { font-size: 16px; }
+#topbar .ageInfo { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
+#topbar .hint { margin-left: auto; font-size: 12px; color: #a9a08a; }
+
+.progressbar { width: 90px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
+.progressbar .fill { height: 100%; background: linear-gradient(90deg,#e8c14a,#f3d97a); width: 0%; }
+.hidden { display: none !important; }
+
+#bottompanel {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
+  background: rgba(20, 20, 24, 0.92); color: #f0e6d2;
+  display: flex; z-index: 20; border-top: 2px solid #5a4a2a;
+}
+#selectionInfo { width: 300px; padding: 10px; border-right: 1px solid #4a4030; overflow-y: auto; font-size: 13px; }
+#selectionInfo .placeholder { color: #8a8270; }
+#selectionInfo .name { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+#selectionInfo .hpbar { width: 100%; height: 8px; background: #400; border-radius: 3px; overflow: hidden; margin: 4px 0; }
+#selectionInfo .hpbar .fill { height: 100%; background: #4caf50; }
+#selectionInfo .stats { display: flex; gap: 10px; font-size: 12px; color: #cfc7ae; flex-wrap: wrap; }
+#selectionInfo .groupItem { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #3a3428; }
+
+#actionButtons { flex: 1; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; overflow-y: auto; }
+
+.actBtn {
+  width: 108px; height: 68px; background: #2b2620; border: 1px solid #6b5a30; border-radius: 6px;
+  color: #f0e6d2; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 12px; padding: 4px; position: relative; gap: 2px;
+}
+.actBtn:hover:not(.disabled) { background: #453c2c; border-color: #e8c14a; }
+.actBtn .icon { font-size: 20px; }
+.actBtn .cost { font-size: 10px; color: #cbbf8f; }
+.actBtn.disabled { opacity: 0.45; cursor: not-allowed; }
+.actBtn .queueBadge {
+  position: absolute; top: 2px; right: 4px; background: #e8c14a; color: #222;
+  font-size: 10px; border-radius: 8px; padding: 0 5px;
+}
+.actBtn .miniProgress { position: absolute; bottom: 0; left: 0; height: 4px; background: #7cc36b; }
+.sectionLabel { width: 100%; font-size: 11px; color: #a9a08a; margin: 2px 0 -2px 0; }
+
+#gameOverOverlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+}
+#gameOverBox { background: #201c16; border: 2px solid #e8c14a; border-radius: 10px; padding: 30px 50px; text-align: center; color: #f0e6d2; }
+#gameOverText { font-size: 28px; margin-bottom: 18px; }
+#restartBtn { font-size: 16px; padding: 8px 20px; cursor: pointer; border-radius: 6px; border: 1px solid #e8c14a; background: #3a3222; color: #f0e6d2; }
+#restartBtn:hover { background: #4a4030; }
+
+</style>
 </head>
 <body>
   <canvas id="game"></canvas>
@@ -33,6 +94,2085 @@
     </div>
   </div>
 
-  <script type="module" src="js/game.js"></script>
+  <script>
+
+// ===== data.js =====
+// 遊戲數值資料：建築、單位、年代、科技
+
+const TILE = 32;
+const MAP_W = 50; // 格數
+const MAP_H = 38;
+
+const AGES = [
+  { id: 0, name: '黑暗時代', nextCost: null },
+  {
+    id: 1,
+    name: '封建時代',
+    nextCost: { food: 400, wood: 200 },
+    researchTime: 25,
+    unlocks: ['ArcheryRange', 'Stable', 'Blacksmith', 'LumberCamp', 'MiningCamp'],
+  },
+  {
+    id: 2,
+    name: '城堡時代',
+    nextCost: { food: 700, gold: 400 },
+    researchTime: 35,
+    unlocks: [],
+  },
+];
+
+// 建築定義
+const BUILDINGS = {
+  TownCenter: {
+    name: '城鎮中心',
+    hp: 1500,
+    size: 3,
+    cost: {},
+    buildTime: 0,
+    trains: ['Villager'],
+    dropOff: ['wood', 'food', 'gold'],
+    pop: 5,
+    canAgeUp: true,
+    sight: 8,
+  },
+  House: {
+    name: '房屋',
+    hp: 250,
+    size: 2,
+    cost: { wood: 30 },
+    buildTime: 12,
+    pop: 5,
+    sight: 4,
+  },
+  Barracks: {
+    name: '兵營',
+    hp: 600,
+    size: 3,
+    cost: { wood: 150 },
+    buildTime: 18,
+    trains: ['Militia', 'Spearman'],
+    sight: 5,
+  },
+  ArcheryRange: {
+    name: '射箭場',
+    hp: 600,
+    size: 3,
+    cost: { wood: 175 },
+    buildTime: 20,
+    trains: ['Archer'],
+    requiresAge: 1,
+    sight: 5,
+  },
+  Stable: {
+    name: '馬廄',
+    hp: 600,
+    size: 3,
+    cost: { wood: 175 },
+    buildTime: 20,
+    trains: ['Scout'],
+    requiresAge: 1,
+    sight: 5,
+  },
+  Blacksmith: {
+    name: '鐵匠鋪',
+    hp: 500,
+    size: 3,
+    cost: { wood: 150 },
+    buildTime: 18,
+    researches: ['Forging', 'ScaleMailArmor', 'Fletching', 'BitDesign'],
+    requiresAge: 1,
+    sight: 4,
+  },
+  Farm: {
+    name: '農場',
+    hp: 150,
+    size: 2,
+    cost: { wood: 60 },
+    buildTime: 10,
+    isFarm: true,
+    foodAmount: 300,
+    sight: 3,
+  },
+  LumberCamp: {
+    name: '伐木場',
+    hp: 400,
+    size: 2,
+    cost: { wood: 100 },
+    buildTime: 12,
+    dropOff: ['wood'],
+    requiresAge: 1,
+    sight: 4,
+  },
+  MiningCamp: {
+    name: '採礦場',
+    hp: 400,
+    size: 2,
+    cost: { wood: 100 },
+    buildTime: 12,
+    dropOff: ['gold'],
+    requiresAge: 1,
+    sight: 4,
+  },
+};
+
+// 單位定義。attack/armor/hp 為基礎值，會被科技加成修改（存於 player.techBonus）
+const UNITS = {
+  Villager: {
+    name: '村民',
+    hp: 30,
+    attack: 3,
+    armor: 0,
+    range: 0,
+    speed: 50,
+    cost: { food: 50 },
+    trainTime: 12,
+    gatherRate: 0.42,
+    carryCap: 10,
+    canBuild: true,
+    canGather: true,
+    class: 'villager',
+    radius: 9,
+  },
+  Militia: {
+    name: '長矛民兵',
+    hp: 40,
+    attack: 4,
+    armor: 1,
+    range: 0,
+    speed: 48,
+    cost: { food: 60, gold: 20 },
+    trainTime: 16,
+    class: 'infantry',
+    radius: 10,
+    upgradeTo: 'Swordsman',
+  },
+  Swordsman: {
+    name: '劍士',
+    hp: 60,
+    attack: 9,
+    armor: 2,
+    range: 0,
+    speed: 48,
+    cost: { food: 60, gold: 20 },
+    trainTime: 16,
+    class: 'infantry',
+    radius: 10,
+    upgradeTo: 'LongSwordsman',
+  },
+  LongSwordsman: {
+    name: '長劍士',
+    hp: 75,
+    attack: 12,
+    armor: 3,
+    range: 0,
+    speed: 48,
+    cost: { food: 70, gold: 25 },
+    trainTime: 18,
+    class: 'infantry',
+    radius: 10,
+  },
+  Spearman: {
+    name: '長槍兵',
+    hp: 45,
+    attack: 3,
+    armor: 0,
+    range: 0,
+    speed: 47,
+    cost: { food: 35, wood: 25 },
+    trainTime: 16,
+    requiresAge: 1,
+    class: 'infantry',
+    bonusVs: { cavalry: 18 },
+    radius: 10,
+  },
+  Archer: {
+    name: '弓箭手',
+    hp: 30,
+    attack: 4,
+    armor: 0,
+    range: 4 * TILE,
+    speed: 46,
+    cost: { wood: 25, gold: 45 },
+    trainTime: 18,
+    requiresAge: 1,
+    class: 'archer',
+    radius: 9,
+    upgradeTo: 'Crossbowman',
+    projectileSpeed: 320,
+  },
+  Crossbowman: {
+    name: '弩手',
+    hp: 35,
+    attack: 6,
+    armor: 0,
+    range: 4.5 * TILE,
+    speed: 46,
+    cost: { wood: 25, gold: 45 },
+    trainTime: 18,
+    class: 'archer',
+    radius: 9,
+    projectileSpeed: 360,
+  },
+  Scout: {
+    name: '偵察騎兵',
+    hp: 45,
+    attack: 3,
+    armor: 2,
+    range: 0,
+    speed: 85,
+    cost: { food: 80 },
+    trainTime: 20,
+    requiresAge: 1,
+    class: 'cavalry',
+    radius: 11,
+    upgradeTo: 'Knight',
+  },
+  Knight: {
+    name: '騎士',
+    hp: 100,
+    attack: 10,
+    armor: 2,
+    range: 0,
+    speed: 85,
+    cost: { food: 90, gold: 30 },
+    trainTime: 22,
+    class: 'cavalry',
+    radius: 11,
+  },
+};
+
+// 兵營/馬廄/射箭場內可研究的兵種升級（花費+時間），觸發後把某類別已存在單位全部替換數值並改變之後訓練的單位種類
+const UNIT_UPGRADES = {
+  Swordsman: { name: '劍士升級', cost: { food: 100, gold: 30 }, time: 20, requiresAge: 1, from: 'Militia', building: 'Barracks' },
+  LongSwordsman: { name: '長劍士升級', cost: { food: 150, gold: 60 }, time: 25, requiresAge: 2, from: 'Swordsman', building: 'Barracks' },
+  Crossbowman: { name: '弩手升級', cost: { wood: 100, gold: 80 }, time: 25, requiresAge: 2, from: 'Archer', building: 'ArcheryRange' },
+  Knight: { name: '騎士升級', cost: { food: 150, gold: 100 }, time: 25, requiresAge: 2, from: 'Scout', building: 'Stable' },
+};
+
+// 鐵匠鋪科技：對特定兵種類別加成攻擊/護甲
+const TECHS = {
+  Forging: { name: '鍛造術（步兵攻擊+2）', cost: { food: 150, gold: 0 }, time: 20, requiresAge: 1, effect: { class: 'infantry', attack: 2 } },
+  ScaleMailArmor: { name: '鱗甲術（步兵護甲+1）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'infantry', armor: 1 } },
+  Fletching: { name: '箭術（弓兵攻擊+2）', cost: { wood: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'archer', attack: 2 } },
+  BitDesign: { name: '馬具術（騎兵速度+15%）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'cavalry', speedMul: 1.15 } },
+};
+
+const RESOURCE_TYPES = ['wood', 'food', 'gold'];
+
+const STARTING_RESOURCES = { wood: 200, food: 200, gold: 100 };
+const STARTING_POP_CAP = 5;
+const MAX_POP_CAP = 100;
+
+// ===== map.js =====
+let nextResId = 1;
+
+class GameMap {
+  constructor() {
+    this.w = MAP_W;
+    this.h = MAP_H;
+    this.blocked = new Uint8Array(this.w * this.h);
+    this.resources = [];
+  }
+
+  idx(tx, ty) {
+    return ty * this.w + tx;
+  }
+
+  inBounds(tx, ty) {
+    return tx >= 0 && ty >= 0 && tx < this.w && ty < this.h;
+  }
+
+  isBlocked(tx, ty) {
+    if (!this.inBounds(tx, ty)) return true;
+    return this.blocked[this.idx(tx, ty)] === 1;
+  }
+
+  worldToTile(x, y) {
+    return { tx: Math.floor(x / TILE), ty: Math.floor(y / TILE) };
+  }
+
+  tileCenter(tx, ty) {
+    return { x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 };
+  }
+
+  setFootprint(centerX, centerY, sizeTiles, value) {
+    const { tx, ty } = this.worldToTile(centerX, centerY);
+    const half = Math.floor(sizeTiles / 2);
+    for (let dy = -half; dy < sizeTiles - half; dy++) {
+      for (let dx = -half; dx < sizeTiles - half; dx++) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (this.inBounds(nx, ny)) this.blocked[this.idx(nx, ny)] = value ? 1 : 0;
+      }
+    }
+  }
+
+  canPlaceFootprint(centerX, centerY, sizeTiles) {
+    const { tx, ty } = this.worldToTile(centerX, centerY);
+    const half = Math.floor(sizeTiles / 2);
+    for (let dy = -half; dy < sizeTiles - half; dy++) {
+      for (let dx = -half; dx < sizeTiles - half; dx++) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (!this.inBounds(nx, ny) || this.isBlocked(nx, ny)) return false;
+      }
+    }
+    return true;
+  }
+
+  addResource(type, x, y, amount) {
+    const r = { id: nextResId++, type, x, y, amount, maxAmount: amount, radius: 14 };
+    this.resources.push(r);
+    return r;
+  }
+
+  removeResource(r) {
+    const i = this.resources.indexOf(r);
+    if (i >= 0) this.resources.splice(i, 1);
+  }
+
+  nearestResource(type, x, y, excludeDepleted = true) {
+    let best = null;
+    let bestD = Infinity;
+    for (const r of this.resources) {
+      if (r.type !== type) continue;
+      if (excludeDepleted && r.amount <= 0) continue;
+      const d = (r.x - x) ** 2 + (r.y - y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = r;
+      }
+    }
+    return best;
+  }
+
+  // A* 尋路，回傳世界座標路徑點陣列（不含起點）
+  findPath(sx, sy, ex, ey) {
+    const start = this.worldToTile(sx, sy);
+    const end = this.worldToTile(ex, ey);
+    if (!this.inBounds(end.tx, end.ty)) return [];
+    if (start.tx === end.tx && start.ty === end.ty) return [{ x: ex, y: ey }];
+
+    const key = (tx, ty) => ty * this.w + tx;
+    const open = new Map();
+    const closed = new Set();
+    const gScore = new Map();
+    const fScore = new Map();
+    const parent = new Map();
+
+    const h = (tx, ty) => Math.abs(tx - end.tx) + Math.abs(ty - end.ty);
+
+    const startKey = key(start.tx, start.ty);
+    gScore.set(startKey, 0);
+    fScore.set(startKey, h(start.tx, start.ty));
+    open.set(startKey, { tx: start.tx, ty: start.ty });
+
+    const dirs = [
+      [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+      [1, 1, 1.4142], [1, -1, 1.4142], [-1, 1, 1.4142], [-1, -1, 1.4142],
+    ];
+
+    let iterations = 0;
+    const maxIterations = 4000;
+
+    // 允許目標格本身即使被阻擋也可視為可達邊界（用於攻擊/採集移動到目標旁）
+    const endBlockedButTarget = this.isBlocked(end.tx, end.ty);
+
+    while (open.size > 0 && iterations < maxIterations) {
+      iterations++;
+      let curKey = null;
+      let curF = Infinity;
+      for (const [k, v] of open) {
+        const f = fScore.get(k) ?? Infinity;
+        if (f < curF) {
+          curF = f;
+          curKey = k;
+        }
+      }
+      const cur = open.get(curKey);
+      open.delete(curKey);
+      closed.add(curKey);
+
+      if (cur.tx === end.tx && cur.ty === end.ty) {
+        const path = [];
+        let ck = curKey;
+        while (parent.has(ck)) {
+          const p = parent.get(ck);
+          const t = { tx: ck % this.w, ty: Math.floor(ck / this.w) };
+          path.push(this.tileCenter(t.tx, t.ty));
+          ck = p;
+        }
+        path.reverse();
+        if (path.length > 0) path[path.length - 1] = { x: ex, y: ey };
+        else path.push({ x: ex, y: ey });
+        return path;
+      }
+
+      for (const [dx, dy, cost] of dirs) {
+        const nx = cur.tx + dx;
+        const ny = cur.ty + dy;
+        if (!this.inBounds(nx, ny)) continue;
+        const isTarget = nx === end.tx && ny === end.ty;
+        if (this.isBlocked(nx, ny) && !(isTarget && endBlockedButTarget)) continue;
+        const nk = key(nx, ny);
+        if (closed.has(nk)) continue;
+        const tentativeG = (gScore.get(curKey) ?? Infinity) + cost;
+        if (tentativeG < (gScore.get(nk) ?? Infinity)) {
+          parent.set(nk, curKey);
+          gScore.set(nk, tentativeG);
+          fScore.set(nk, tentativeG + h(nx, ny));
+          if (!open.has(nk)) open.set(nk, { tx: nx, ty: ny });
+        }
+      }
+    }
+    return null; // 找不到路徑
+  }
+}
+
+function scatterCluster(map, type, cx, cy, count, spread, amount) {
+  const nodes = [];
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = Math.random() * spread;
+    const x = cx + Math.cos(ang) * dist;
+    const y = cy + Math.sin(ang) * dist;
+    nodes.push(map.addResource(type, x, y, amount));
+  }
+  return nodes;
+}
+
+function generateMap() {
+  const map = new GameMap();
+  const worldW = map.w * TILE;
+  const worldH = map.h * TILE;
+
+  const playerStart = { x: 3 * TILE, y: (map.h - 3) * TILE };
+  const aiStart = { x: (map.w - 3) * TILE, y: 3 * TILE };
+
+  for (const start of [playerStart, aiStart]) {
+    scatterCluster(map, 'wood', start.x + (start === playerStart ? 220 : -220), start.y + (start === playerStart ? -60 : 60), 10, 90, 250);
+    scatterCluster(map, 'gold', start.x + (start === playerStart ? 260 : -260), start.y + (start === playerStart ? 40 : -40), 4, 40, 700);
+    scatterCluster(map, 'food', start.x + (start === playerStart ? 60 : -60), start.y + (start === playerStart ? -260 : 260), 5, 50, 250);
+  }
+
+  // 中央中立資源
+  scatterCluster(map, 'wood', worldW / 2, worldH / 2, 14, 200, 250);
+  scatterCluster(map, 'gold', worldW / 2 + 150, worldH / 2 - 100, 4, 60, 700);
+  scatterCluster(map, 'gold', worldW / 2 - 150, worldH / 2 + 100, 4, 60, 700);
+  scatterCluster(map, 'food', worldW / 2 - 100, worldH / 2 - 150, 4, 60, 250);
+  scatterCluster(map, 'food', worldW / 2 + 100, worldH / 2 + 150, 4, 60, 250);
+
+  return { map, playerStart, aiStart };
+}
+
+// ===== entities.js =====
+let nextEntityId = 1;
+
+class Player {
+  constructor(id, name, isAI) {
+    this.id = id;
+    this.name = name;
+    this.isAI = isAI;
+    this.resources = { ...STARTING_RESOURCES };
+    this.popCap = STARTING_POP_CAP;
+    this.age = 0;
+    this.ageResearch = null; // {timeLeft, total}
+    this.buildings = [];
+    this.units = [];
+    this.techsResearched = new Set();
+    this.unitLine = { Militia: 'Militia', Archer: 'Archer', Scout: 'Scout' }; // 目前該兵種線最新型態
+    this.bonus = {}; // class -> {attack, armor, speedMul}
+    this.defeated = false;
+  }
+
+  currentPop() {
+    return this.units.length;
+  }
+
+  canAfford(cost) {
+    for (const k in cost) {
+      if ((this.resources[k] || 0) < cost[k]) return false;
+    }
+    return true;
+  }
+
+  pay(cost) {
+    for (const k in cost) {
+      this.resources[k] -= cost[k];
+    }
+  }
+
+  getBonus(cls) {
+    return this.bonus[cls] || { attack: 0, armor: 0, speedMul: 1 };
+  }
+
+  applyTechEffect(effect) {
+    const b = this.bonus[effect.class] || { attack: 0, armor: 0, speedMul: 1 };
+    if (effect.attack) b.attack += effect.attack;
+    if (effect.armor) b.armor += effect.armor;
+    if (effect.speedMul) b.speedMul *= effect.speedMul;
+    this.bonus[effect.class] = b;
+  }
+
+  unitStats(type) {
+    const base = UNITS[type];
+    const bonus = this.getBonus(base.class);
+    return {
+      ...base,
+      attack: base.attack + bonus.attack,
+      armor: base.armor + bonus.armor,
+      speed: base.speed * bonus.speedMul,
+    };
+  }
+}
+
+function createUnit(owner, type, x, y) {
+  const base = UNITS[type];
+  return {
+    id: nextEntityId++,
+    kind: 'unit',
+    owner,
+    type,
+    x, y,
+    hp: base.hp,
+    maxHp: base.hp,
+    stats: base,
+    radius: base.radius,
+    path: [],
+    task: null,
+    attackCooldown: 0,
+    carry: { type: null, amount: 0 },
+    selected: false,
+    facing: 0,
+    repathTimer: 0,
+    flashTimer: 0,
+  };
+}
+
+function createBuilding(owner, type, x, y, opts = {}) {
+  const def = BUILDINGS[type];
+  const maxHp = def.hp;
+  const constructing = !opts.instant;
+  return {
+    id: nextEntityId++,
+    kind: 'building',
+    owner,
+    type,
+    x, y,
+    hp: constructing ? Math.max(1, Math.floor(maxHp * 0.1)) : maxHp,
+    maxHp,
+    def,
+    sizeTiles: def.size,
+    constructing,
+    builders: 0,
+    trainQueue: [],
+    trainProgress: 0,
+    research: null,
+    selected: false,
+    rally: null,
+    flashTimer: 0,
+  };
+}
+
+function dist(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function buildingRadius(building) {
+  return (building.sizeTiles * TILE) / 2;
+}
+
+// 建築物是正方形佔地，approachPoint 也是用「棋盤距離」(Chebyshev) 算落點；
+// 若「是否夠近可以互動」的判定改用直線距離，從對角線方向靠近時，approachPoint
+// 落點的直線距離會比判定門檻遠一點，導致單位卡在原地永遠進不了判定範圍。
+// 因此靠近建築物的判定一律用棋盤距離，跟 approachPoint 保持一致。
+function buildingProximity(pos, building) {
+  return Math.max(Math.abs(pos.x - building.x), Math.abs(pos.y - building.y));
+}
+
+function moveUnitTowardsPath(unit, dt) {
+  if (!unit.path || unit.path.length === 0) return true;
+  let remaining = unit.stats.speed * dt;
+  while (remaining > 0 && unit.path.length > 0) {
+    const wp = unit.path[0];
+    const dx = wp.x - unit.x;
+    const dy = wp.y - unit.y;
+    const d = Math.hypot(dx, dy);
+    if (d <= remaining) {
+      unit.x = wp.x;
+      unit.y = wp.y;
+      remaining -= d;
+      unit.path.shift();
+    } else {
+      unit.x += (dx / d) * remaining;
+      unit.y += (dy / d) * remaining;
+      unit.facing = Math.atan2(dy, dx);
+      remaining = 0;
+    }
+  }
+  return unit.path.length === 0;
+}
+
+function damageOf(attackerStats, targetStats, targetClass) {
+  let atk = attackerStats.attack;
+  if (attackerStats.bonusVs && attackerStats.bonusVs[targetClass]) {
+    atk += attackerStats.bonusVs[targetClass];
+  }
+  const dmg = atk - targetStats.armor;
+  return Math.max(1, dmg);
+}
+
+function unitClassOf(unit) {
+  return unit.stats.class;
+}
+
+function effectiveStats(unit) {
+  return unit.owner.unitStats(unit.type);
+}
+
+// 建築物整個佔地格都會被地圖標記為阻擋，A* 無法直接走到建築中心；
+// 回傳建築物外緣（略帶緩衝）的一點，讓單位可以合法走到附近再判定距離。
+// 優先嘗試朝向 fromX/fromY 的方向，若該點恰好落在鄰近建築的佔地內（建築密集擺放時常見），
+// 依序嘗試其他七個方位，避免單位卡在原地永遠走不到。
+function approachPoint(map, building, fromX, fromY) {
+  const half = buildingRadius(building);
+  const pad = 10;
+  let dx0 = fromX - building.x;
+  let dy0 = fromY - building.y;
+  if (Math.abs(dx0) < 0.01 && Math.abs(dy0) < 0.01) { dx0 = 1; dy0 = 0; }
+  const baseAngle = Math.atan2(dy0, dx0);
+  const angleOffsets = [0, -Math.PI / 4, Math.PI / 4, -Math.PI / 2, Math.PI / 2, -3 * Math.PI / 4, 3 * Math.PI / 4, Math.PI];
+  const candidates = angleOffsets.map((off) => {
+    const ang = baseAngle + off;
+    const dx = Math.cos(ang);
+    const dy = Math.sin(ang);
+    const scale = (half + pad) / Math.max(Math.abs(dx), Math.abs(dy));
+    return { x: building.x + dx * scale, y: building.y + dy * scale };
+  });
+  if (map) {
+    for (const c of candidates) {
+      const { tx, ty } = map.worldToTile(c.x, c.y);
+      if (!map.isBlocked(tx, ty)) return c;
+    }
+  }
+  return candidates[0];
+}
+
+const _data = { BUILDINGS, UNITS, UNIT_UPGRADES, TECHS, AGES, RESOURCE_TYPES };
+
+// ===== sim.js =====
+const AGGRO_RANGE = 6 * TILE;
+const ATTACK_INTERVAL = { infantry: 1.5, cavalry: 1.4, archer: 1.9, villager: 2.2 };
+
+function findDropOff(player, resourceType, fx, fy) {
+  let best = null;
+  let bestD = Infinity;
+  for (const b of player.buildings) {
+    if (b.constructing) continue;
+    if (!b.def.dropOff || !b.def.dropOff.includes(resourceType)) continue;
+    const d = dist({ x: fx, y: fy }, b);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+function pathTo(map, unit, tx, ty) {
+  const p = map.findPath(unit.x, unit.y, tx, ty);
+  unit.path = p || [];
+}
+
+function pathToBuilding(map, unit, building) {
+  const ap = approachPoint(map, building, unit.x, unit.y);
+  pathTo(map, unit, ap.x, ap.y);
+}
+
+function issueMove(map, unit, x, y) {
+  unit.task = { type: 'move' };
+  pathTo(map, unit, x, y);
+}
+
+function issueGather(map, unit, resource) {
+  unit.task = { type: 'gather', resource, resourceType: resource.type, phase: 'toResource' };
+  pathTo(map, unit, resource.x, resource.y);
+}
+
+function issueGatherFarm(map, unit, farm) {
+  unit.task = { type: 'gatherFarm', farm, phase: 'toFarm' };
+  pathTo(map, unit, farm.x, farm.y);
+}
+
+function issueBuild(map, unit, building) {
+  unit.task = { type: 'build', building };
+  pathToBuilding(map, unit, building);
+}
+
+function issueAttack(map, unit, target) {
+  unit.task = { type: 'attack', target };
+  unit.path = [];
+}
+
+function findNearestEnemy(state, ownerId, x, y, range) {
+  let best = null;
+  let bestD = Infinity;
+  for (const p of state.players) {
+    if (p.id === ownerId) continue;
+    for (const u of p.units) {
+      const d = dist({ x, y }, u);
+      if (d <= range && d < bestD) {
+        bestD = d;
+        best = u;
+      }
+    }
+    for (const b of p.buildings) {
+      const d = dist({ x, y }, b);
+      if (d <= range && d < bestD) {
+        bestD = d;
+        best = b;
+      }
+    }
+  }
+  return best;
+}
+
+function spawnProjectile(state, unit, target, dmg) {
+  const stats = effectiveStats(unit);
+  const speed = stats.projectileSpeed || 300;
+  state.projectiles.push({
+    x: unit.x, y: unit.y, targetRefX: target.x, targetRefY: target.y,
+    target, dmg, speed, owner: unit.owner,
+  });
+}
+
+function dealDamage(state, target, dmg, attackerOwner) {
+  target.hp -= dmg;
+  target.flashTimer = 0.15;
+  if (target.hp <= 0) {
+    removeEntity(state, target);
+  }
+}
+
+function removeEntity(state, entity) {
+  const owner = entity.owner;
+  if (entity.kind === 'unit') {
+    const i = owner.units.indexOf(entity);
+    if (i >= 0) owner.units.splice(i, 1);
+  } else {
+    const i = owner.buildings.indexOf(entity);
+    if (i >= 0) owner.buildings.splice(i, 1);
+    state.map.setFootprint(entity.x, entity.y, entity.sizeTiles, false);
+  }
+}
+
+function targetRadiusOf(target) {
+  return target.kind === 'building' ? buildingRadius(target) : target.radius;
+}
+
+function updateAttackTask(state, unit, dt) {
+  const task = unit.task;
+  const target = task.target;
+  if (target.hp <= 0 || (target.kind === 'unit' ? target.owner.units.indexOf(target) < 0 : target.owner.buildings.indexOf(target) < 0)) {
+    unit.task = null;
+    unit.path = [];
+    return;
+  }
+  const stats = effectiveStats(unit);
+  const rangeNeeded = stats.range + unit.radius + targetRadiusOf(target) + 2;
+  const d = target.kind === 'building' ? buildingProximity(unit, target) : dist(unit, target);
+  if (d > rangeNeeded) {
+    unit.repathTimer -= dt;
+    if (unit.path.length === 0 || unit.repathTimer <= 0) {
+      const dest = target.kind === 'building' ? approachPoint(state.map, target, unit.x, unit.y) : target;
+      pathTo(state.map, unit, dest.x, dest.y);
+      unit.repathTimer = 0.7;
+    }
+    moveUnitTowardsPath(unit, dt);
+  } else {
+    unit.path = [];
+    unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
+    if (unit.attackCooldown <= 0) {
+      const targetClass = target.kind === 'unit' ? target.stats.class : 'building';
+      const targetArmor = target.kind === 'unit' ? effectiveStats(target).armor : 0;
+      const dmg = damageOf(stats, { armor: targetArmor }, targetClass);
+      if (stats.range > 0) {
+        spawnProjectile(state, unit, target, dmg);
+      } else {
+        dealDamage(state, target, dmg, unit.owner);
+      }
+      unit.attackCooldown = ATTACK_INTERVAL[stats.class] || 1.6;
+    }
+  }
+}
+
+function updateGatherTask(state, unit, dt) {
+  const map = state.map;
+  const task = unit.task;
+  const stats = effectiveStats(unit);
+  if (task.phase === 'toResource') {
+    if (!task.resource || task.resource.amount <= 0) {
+      const alt = map.nearestResource(task.resourceType, unit.x, unit.y);
+      if (!alt) {
+        unit.task = null;
+        return;
+      }
+      task.resource = alt;
+      pathTo(map, unit, alt.x, alt.y);
+    }
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = dist(unit, task.resource);
+      if (d <= task.resource.radius + unit.radius + 6) {
+        task.phase = 'gathering';
+      } else {
+        pathTo(map, unit, task.resource.x, task.resource.y);
+      }
+    }
+  } else if (task.phase === 'gathering') {
+    const res = task.resource;
+    if (!res || res.amount <= 0) {
+      task.phase = 'toDropoff';
+      task.dropoff = findDropOff(unit.owner, task.resourceType, unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
+      return;
+    }
+    const take = Math.min(stats.gatherRate * dt, res.amount, stats.carryCap - unit.carry.amount);
+    res.amount -= take;
+    unit.carry.type = task.resourceType;
+    unit.carry.amount += take;
+    if (res.amount <= 0) map.removeResource(res);
+    if (unit.carry.amount >= stats.carryCap - 0.001 || res.amount <= 0) {
+      task.phase = 'toDropoff';
+      task.dropoff = findDropOff(unit.owner, task.resourceType, unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
+    }
+  } else if (task.phase === 'toDropoff') {
+    if (!task.dropoff || task.dropoff.hp <= 0) {
+      task.dropoff = findDropOff(unit.owner, task.resourceType, unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
+      else return;
+    }
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = buildingProximity(unit, task.dropoff);
+      if (d <= buildingRadius(task.dropoff) + unit.radius + 6) {
+        unit.owner.resources[unit.carry.type] = (unit.owner.resources[unit.carry.type] || 0) + unit.carry.amount;
+        unit.carry.amount = 0;
+        if (task.resource && task.resource.amount > 0) {
+          task.phase = 'toResource';
+          pathTo(map, unit, task.resource.x, task.resource.y);
+        } else {
+          const alt = map.nearestResource(task.resourceType, unit.x, unit.y);
+          if (alt) {
+            task.resource = alt;
+            task.phase = 'toResource';
+            pathTo(map, unit, alt.x, alt.y);
+          } else {
+            unit.task = null;
+          }
+        }
+      } else {
+        pathToBuilding(map, unit, task.dropoff);
+      }
+    }
+  }
+}
+
+function updateGatherFarmTask(state, unit, dt) {
+  const map = state.map;
+  const task = unit.task;
+  const stats = effectiveStats(unit);
+  const farm = task.farm;
+  if (!farm || farm.hp <= 0 || farm.foodLeft <= 0) {
+    unit.task = null;
+    return;
+  }
+  if (task.phase === 'toFarm') {
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = buildingProximity(unit, farm);
+      if (d <= buildingRadius(farm) + unit.radius + 6) {
+        task.phase = 'gathering';
+      } else {
+        pathToBuilding(map, unit, farm);
+      }
+    }
+  } else if (task.phase === 'gathering') {
+    const take = Math.min(stats.gatherRate * dt, farm.foodLeft, stats.carryCap - unit.carry.amount);
+    farm.foodLeft -= take;
+    unit.carry.type = 'food';
+    unit.carry.amount += take;
+    if (unit.carry.amount >= stats.carryCap - 0.001 || farm.foodLeft <= 0) {
+      task.phase = 'toDropoff';
+      task.dropoff = findDropOff(unit.owner, 'food', unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
+    }
+  } else if (task.phase === 'toDropoff') {
+    if (!task.dropoff || task.dropoff.hp <= 0) {
+      task.dropoff = findDropOff(unit.owner, 'food', unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
+      else return;
+    }
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = buildingProximity(unit, task.dropoff);
+      if (d <= buildingRadius(task.dropoff) + unit.radius + 6) {
+        unit.owner.resources.food += unit.carry.amount;
+        unit.carry.amount = 0;
+        if (farm.foodLeft > 0) {
+          task.phase = 'toFarm';
+          pathToBuilding(map, unit, farm);
+        } else {
+          unit.task = null;
+        }
+      } else {
+        pathToBuilding(map, unit, task.dropoff);
+      }
+    }
+  }
+  if (farm.foodLeft <= 0) {
+    removeEntity(state, farm);
+  }
+}
+
+function updateBuildTask(state, unit, dt) {
+  const building = unit.task.building;
+  if (!building || building.hp <= 0) {
+    unit.task = null;
+    return;
+  }
+  const arrived = moveUnitTowardsPath(unit, dt);
+  if (arrived) {
+    const d = buildingProximity(unit, building);
+    if (d > buildingRadius(building) + unit.radius + 8) {
+      pathToBuilding(state.map, unit, building);
+      return;
+    }
+    if (!building.constructing) {
+      unit.task = null;
+      return;
+    }
+    const rate = (building.maxHp * 0.9) / (building.def.buildTime || 10);
+    building.hp = Math.min(building.maxHp, building.hp + rate * dt);
+    if (building.hp >= building.maxHp) {
+      building.hp = building.maxHp;
+      building.constructing = false;
+      unit.task = null;
+    }
+  }
+}
+
+function updateUnit(state, unit, dt) {
+  if (unit.flashTimer > 0) unit.flashTimer -= dt;
+  if (unit.attackCooldown > 0) unit.attackCooldown -= dt;
+
+  if (!unit.task) {
+    const cls = unit.stats.class;
+    if (cls !== 'villager') {
+      const enemy = findNearestEnemy(state, unit.owner.id, unit.x, unit.y, AGGRO_RANGE);
+      if (enemy) {
+        issueAttack(state.map, unit, enemy);
+      }
+    }
+    return;
+  }
+
+  switch (unit.task.type) {
+    case 'move': {
+      const arrived = moveUnitTowardsPath(unit, dt);
+      if (arrived) unit.task = null;
+      break;
+    }
+    case 'attack':
+      updateAttackTask(state, unit, dt);
+      break;
+    case 'gather':
+      updateGatherTask(state, unit, dt);
+      break;
+    case 'gatherFarm':
+      updateGatherFarmTask(state, unit, dt);
+      break;
+    case 'build':
+      updateBuildTask(state, unit, dt);
+      break;
+    default:
+      unit.task = null;
+  }
+}
+
+function findRallyPoint(building) {
+  const r = buildingRadius(building) + 24;
+  return { x: building.x + r, y: building.y + r };
+}
+
+function spawnTrainedUnit(state, player, building, type) {
+  const rp = building.rally || findRallyPoint(building);
+  const unit = createUnit(player, type, rp.x, rp.y);
+  player.units.push(unit);
+  return unit;
+}
+
+function updateBuilding(state, player, building, dt) {
+  if (building.flashTimer > 0) building.flashTimer -= dt;
+  if (!building.constructing) {
+    if (building.trainQueue.length > 0) {
+      const item = building.trainQueue[0];
+      if (player.currentPop() < player.popCap) {
+        building.trainProgress += dt;
+        if (building.trainProgress >= item.totalTime) {
+          spawnTrainedUnit(state, player, building, item.type);
+          building.trainQueue.shift();
+          building.trainProgress = 0;
+        }
+      }
+    }
+    if (building.research) {
+      building.research.timeLeft -= dt;
+      if (building.research.timeLeft <= 0) {
+        applyResearch(player, building.research);
+        building.research = null;
+      }
+    }
+  }
+}
+
+function applyResearch(player, research) {
+  if (research.kind === 'tech') {
+    const tech = TECHS[research.key];
+    player.applyTechEffect(tech.effect);
+    player.techsResearched.add(research.key);
+  } else if (research.kind === 'upgrade') {
+    const upDef = UNIT_UPGRADES[research.key];
+    const oldType = upDef.from;
+    const newType = research.key;
+    for (const rootKey in player.unitLine) {
+      if (player.unitLine[rootKey] === oldType) player.unitLine[rootKey] = newType;
+    }
+    for (const u of player.units) {
+      if (u.type === oldType) {
+        const newBase = UNITS[newType];
+        const ratio = u.hp / u.maxHp;
+        u.type = newType;
+        u.stats = newBase;
+        u.maxHp = newBase.hp;
+        u.hp = Math.max(1, Math.round(newBase.hp * ratio));
+        u.radius = newBase.radius;
+      }
+    }
+  }
+}
+
+function startAgeUp(player) {
+  const nextAge = AGES[player.age + 1];
+  if (!nextAge || player.ageResearch) return false;
+  if (!player.canAfford(nextAge.nextCost)) return false;
+  player.pay(nextAge.nextCost);
+  player.ageResearch = { timeLeft: nextAge.researchTime, total: nextAge.researchTime, toAge: player.age + 1 };
+  return true;
+}
+
+function updatePlayerAge(player, dt) {
+  if (player.ageResearch) {
+    player.ageResearch.timeLeft -= dt;
+    if (player.ageResearch.timeLeft <= 0) {
+      player.age = player.ageResearch.toAge;
+      player.ageResearch = null;
+    }
+  }
+}
+
+function startTraining(player, building, type) {
+  const def = UNITS[type];
+  if (!def) return false;
+  if (!player.canAfford(def.cost || {})) return false;
+  if (building.trainQueue.length >= 10) return false;
+  player.pay(def.cost || {});
+  building.trainQueue.push({ type, totalTime: def.trainTime || 10 });
+  return true;
+}
+
+function startBuildingConstruction(state, player, type, x, y) {
+  const def = BUILDINGS[type];
+  if (!player.canAfford(def.cost || {})) return null;
+  if (!state.map.canPlaceFootprint(x, y, def.size)) return null;
+  player.pay(def.cost || {});
+  const b = createBuilding(player, type, x, y);
+  if (def.isFarm) b.foodLeft = def.foodAmount;
+  player.buildings.push(b);
+  state.map.setFootprint(x, y, def.size, true);
+  return b;
+}
+
+function startResearchTech(player, building, key) {
+  const tech = TECHS[key];
+  if (!tech || building.research || player.techsResearched.has(key)) return false;
+  if (!player.canAfford(tech.cost)) return false;
+  player.pay(tech.cost);
+  building.research = { kind: 'tech', key, timeLeft: tech.time, total: tech.time };
+  return true;
+}
+
+function startUnitUpgrade(player, building, key) {
+  const up = UNIT_UPGRADES[key];
+  if (!up || building.research) return false;
+  if (!player.canAfford(up.cost)) return false;
+  player.pay(up.cost);
+  building.research = { kind: 'upgrade', key, timeLeft: up.time, total: up.time };
+  return true;
+}
+
+function updateProjectiles(state, dt) {
+  const arrived = [];
+  for (const p of state.projectiles) {
+    const dx = p.target.x - p.x;
+    const dy = p.target.y - p.y;
+    const d = Math.hypot(dx, dy);
+    const step = p.speed * dt;
+    if (d <= step || d < 4) {
+      if (p.target.hp > 0) dealDamage(state, p.target, p.dmg, p.owner);
+      arrived.push(p);
+    } else {
+      p.x += (dx / d) * step;
+      p.y += (dy / d) * step;
+    }
+  }
+  if (arrived.length) {
+    state.projectiles = state.projectiles.filter((p) => !arrived.includes(p));
+  }
+}
+
+function recalcPopCap(player) {
+  let cap = 0;
+  for (const b of player.buildings) {
+    if (b.constructing) continue;
+    if (b.def.pop) cap += b.def.pop;
+  }
+  player.popCap = Math.min(MAX_POP_CAP, Math.max(5, cap));
+}
+
+// ===== ai.js =====
+function createAIState(homeX, homeY) {
+  return {
+    homeX, homeY,
+    tickTimer: 0,
+    attackGroupThreshold: 6,
+    lastAttackWave: 0,
+  };
+}
+
+function findBuildSpot(map, refX, refY, sizeTiles) {
+  const { tx: rtx, ty: rty } = map.worldToTile(refX, refY);
+  for (let radius = 2; radius <= 18; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const tx = rtx + dx;
+        const ty = rty + dy;
+        if (!map.inBounds(tx, ty)) continue;
+        const c = map.tileCenter(tx, ty);
+        if (map.canPlaceFootprint(c.x, c.y, sizeTiles)) return c;
+      }
+    }
+  }
+  return null;
+}
+
+function countGatherers(ai) {
+  const counts = { wood: 0, food: 0, gold: 0 };
+  for (const u of ai.units) {
+    if (u.task && u.task.type === 'gather') counts[u.task.resourceType]++;
+    else if (u.task && u.task.type === 'gatherFarm') counts.food++;
+  }
+  return counts;
+}
+
+function targetRatio(ai) {
+  if (ai.age === 0) return { wood: 0.45, food: 0.4, gold: 0.15 };
+  if (ai.age === 1) return { wood: 0.35, food: 0.3, gold: 0.35 };
+  return { wood: 0.3, food: 0.25, gold: 0.45 };
+}
+
+function assignVillager(state, ai, aiState, villager) {
+  const counts = countGatherers(ai);
+  const total = Math.max(1, counts.wood + counts.food + counts.gold);
+  const ratio = targetRatio(ai);
+  let bestType = 'wood';
+  let bestDeficit = -Infinity;
+  for (const type of ['wood', 'food', 'gold']) {
+    const deficit = ratio[type] - counts[type] / total;
+    if (deficit > bestDeficit) {
+      bestDeficit = deficit;
+      bestType = type;
+    }
+  }
+  const res = state.map.nearestResource(bestType, aiState.homeX, aiState.homeY);
+  if (res) {
+    issueGather(state.map, villager, res);
+    return;
+  }
+  if (bestType === 'food') {
+    for (const b of ai.buildings) {
+      if (b.def.isFarm && !b.constructing && b.foodLeft > 0) {
+        const already = ai.units.filter((u) => u.task && u.task.farm === b).length;
+        if (already < 2) {
+          issueGatherFarm(state.map, villager, b);
+          return;
+        }
+      }
+    }
+    if (ai.canAfford(BUILDINGS.Farm.cost)) {
+      const spot = findBuildSpot(state.map, aiState.homeX, aiState.homeY, BUILDINGS.Farm.size);
+      if (spot) {
+        const b = startBuildingConstruction(state, ai, 'Farm', spot.x, spot.y);
+        if (b) {
+          issueBuild(state.map, villager, b);
+          return;
+        }
+      }
+    }
+  }
+  const anyRes = state.map.nearestResource('wood', aiState.homeX, aiState.homeY) ||
+    state.map.nearestResource('gold', aiState.homeX, aiState.homeY);
+  if (anyRes) issueGather(state.map, villager, anyRes);
+}
+
+function tryBuild(state, ai, aiState, type) {
+  const def = BUILDINGS[type];
+  if (!ai.canAfford(def.cost)) return false;
+  const builder = ai.units.find((u) => u.stats.class === 'villager' && (!u.task || u.task.type === 'gather' || u.task.type === 'gatherFarm'));
+  if (!builder) return false;
+  const spot = findBuildSpot(state.map, aiState.homeX, aiState.homeY, def.size);
+  if (!spot) return false;
+  const b = startBuildingConstruction(state, ai, type, spot.x, spot.y);
+  if (!b) return false;
+  issueBuild(state.map, builder, b);
+  return true;
+}
+
+function has(ai, type) {
+  return ai.buildings.some((b) => b.type === type);
+}
+
+function hasIdleBuilder(ai, type) {
+  return ai.buildings.find((b) => b.type === type && !b.constructing && !b.research);
+}
+
+function economyStep(state, ai, aiState) {
+  for (const u of ai.units) {
+    if (u.stats.class === 'villager' && !u.task) {
+      assignVillager(state, ai, aiState, u);
+    }
+  }
+
+  const villagerCount = ai.units.filter((u) => u.stats.class === 'villager').length;
+  const roomLeft = ai.popCap - ai.currentPop();
+
+  if (roomLeft <= 3 && ai.canAfford(BUILDINGS.House.cost)) {
+    const pendingHouse = ai.buildings.some((b) => b.type === 'House' && b.constructing);
+    if (!pendingHouse) tryBuild(state, ai, aiState, 'House');
+  }
+
+  if (!has(ai, 'Barracks')) {
+    tryBuild(state, ai, aiState, 'Barracks');
+  }
+
+  if (ai.age >= 1) {
+    if (!has(ai, 'ArcheryRange')) tryBuild(state, ai, aiState, 'ArcheryRange');
+    else if (!has(ai, 'Stable')) tryBuild(state, ai, aiState, 'Stable');
+    else if (!has(ai, 'Blacksmith')) tryBuild(state, ai, aiState, 'Blacksmith');
+    else if (!has(ai, 'LumberCamp') && villagerCount >= 8) tryBuild(state, ai, aiState, 'LumberCamp');
+    else if (!has(ai, 'MiningCamp') && villagerCount >= 10) tryBuild(state, ai, aiState, 'MiningCamp');
+  }
+
+  const tc = ai.buildings.find((b) => b.type === 'TownCenter');
+  if (tc && !tc.trainQueue.length && villagerCount < 16 && ai.currentPop() < ai.popCap) {
+    startTraining(ai, tc, 'Villager');
+  }
+
+  if (!ai.ageResearch) {
+    if (ai.age === 0 && villagerCount >= 7) startAgeUp(ai);
+    else if (ai.age === 1 && villagerCount >= 12) startAgeUp(ai);
+  }
+}
+
+function militaryStep(state, ai, aiState) {
+  const barracks = hasIdleBuilder(ai, 'Barracks');
+  if (barracks && barracks.trainQueue.length < 3) {
+    const line = ai.unitLine.Militia;
+    startTraining(ai, barracks, line);
+    if (ai.age >= 1) startTraining(ai, barracks, 'Spearman');
+  }
+  const archery = hasIdleBuilder(ai, 'ArcheryRange');
+  if (archery && archery.trainQueue.length < 3) {
+    startTraining(ai, archery, ai.unitLine.Archer);
+  }
+  const stable = hasIdleBuilder(ai, 'Stable');
+  if (stable && stable.trainQueue.length < 2) {
+    startTraining(ai, stable, ai.unitLine.Scout);
+  }
+
+  const blacksmith = hasIdleBuilder(ai, 'Blacksmith');
+  if (blacksmith && ai.age >= 1) {
+    const techOrder = ['Forging', 'Fletching', 'ScaleMailArmor', 'BitDesign'];
+    for (const key of techOrder) {
+      if (!ai.techsResearched.has(key) && ai.canAfford(TECHS[key].cost)) {
+        startResearchTech(ai, blacksmith, key);
+        break;
+      }
+    }
+  }
+
+  if (barracks && ai.age >= 1 && ai.unitLine.Militia === 'Militia' && ai.canAfford(UNIT_UPGRADES.Swordsman.cost)) {
+    startUnitUpgrade(ai, barracks, 'Swordsman');
+  }
+  if (barracks && ai.age >= 2 && ai.unitLine.Militia === 'Swordsman' && ai.canAfford(UNIT_UPGRADES.LongSwordsman.cost)) {
+    startUnitUpgrade(ai, barracks, 'LongSwordsman');
+  }
+  if (archery && ai.age >= 2 && ai.unitLine.Archer === 'Archer' && ai.canAfford(UNIT_UPGRADES.Crossbowman.cost)) {
+    startUnitUpgrade(ai, archery, 'Crossbowman');
+  }
+  if (stable && ai.age >= 2 && ai.unitLine.Scout === 'Scout' && ai.canAfford(UNIT_UPGRADES.Knight.cost)) {
+    startUnitUpgrade(ai, stable, 'Knight');
+  }
+}
+
+function combatStep(state, ai, aiState, enemy) {
+  const idleMilitary = ai.units.filter((u) => u.stats.class !== 'villager' && (!u.task || u.task.type === 'move'));
+  if (idleMilitary.length >= aiState.attackGroupThreshold) {
+    let target = enemy.buildings.find((b) => b.type === 'TownCenter') || enemy.buildings[0];
+    let bestD = target ? dist({ x: aiState.homeX, y: aiState.homeY }, target) : Infinity;
+    for (const b of enemy.buildings) {
+      const d = dist({ x: aiState.homeX, y: aiState.homeY }, b);
+      if (d < bestD) {
+        bestD = d;
+        target = b;
+      }
+    }
+    if (target) {
+      for (const u of idleMilitary) issueAttack(state.map, u, target);
+      aiState.attackGroupThreshold = Math.min(16, aiState.attackGroupThreshold + 2);
+    }
+  }
+}
+
+function updateAI(state, ai, aiState, enemy, dt) {
+  aiState.tickTimer -= dt;
+  if (aiState.tickTimer > 0) return;
+  aiState.tickTimer = 2.0;
+  if (ai.defeated) return;
+
+  economyStep(state, ai, aiState);
+  militaryStep(state, ai, aiState);
+  combatStep(state, ai, aiState, enemy);
+}
+
+// ===== game.js =====
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const topbarEls = {
+  wood: document.getElementById('resWood'),
+  food: document.getElementById('resFood'),
+  gold: document.getElementById('resGold'),
+  pop: document.getElementById('resPop'),
+  ageName: document.getElementById('ageName'),
+  ageProgressWrap: document.getElementById('ageProgressWrap'),
+  ageProgressFill: document.getElementById('ageProgressFill'),
+};
+const selectionInfoEl = document.getElementById('selectionInfo');
+const actionButtonsEl = document.getElementById('actionButtons');
+const gameOverOverlay = document.getElementById('gameOverOverlay');
+const gameOverText = document.getElementById('gameOverText');
+const restartBtn = document.getElementById('restartBtn');
+
+const BUILD_ICON = {
+  TownCenter: '🏛️', House: '🏠', Barracks: '⚔️', ArcheryRange: '🏹', Stable: '🐎',
+  Blacksmith: '🔨', Farm: '🌾', LumberCamp: '🪓', MiningCamp: '⛏️',
+};
+const UNIT_ICON = {
+  Villager: '🧑‍🌾', Militia: '🗡️', Swordsman: '🗡️', LongSwordsman: '🗡️',
+  Spearman: '🔱', Archer: '🏹', Crossbowman: '🏹', Scout: '🐴', Knight: '🐴',
+};
+const UNIT_LABEL = {
+  Villager: 'V', Militia: 'M', Swordsman: 'S', LongSwordsman: 'L',
+  Spearman: 'Sp', Archer: 'A', Crossbowman: 'C', Scout: 'Sc', Knight: 'K',
+};
+
+let state, human, ai, aiState, camera, selection, placement, uiTimer;
+let dragStart = null;
+let dragCurrent = null;
+let mouseWorld = { x: 0, y: 0 };
+const keys = {};
+
+function costText(cost) {
+  return Object.entries(cost || {}).map(([k, v]) => `${k === 'wood' ? '木' : k === 'food' ? '食' : '金'}${v}`).join(' ');
+}
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+function placeStartingBuilding(player, type, x, y) {
+  const b = createBuilding(player, type, x, y, { instant: true });
+  player.buildings.push(b);
+  state.map.setFootprint(x, y, b.sizeTiles, true);
+  return b;
+}
+
+function initGame() {
+  const gen = generateMap();
+  human = new Player(0, '玩家', false);
+  ai = new Player(1, '電腦', true);
+  state = { map: gen.map, players: [human, ai], projectiles: [], time: 0, ended: false, winner: null };
+
+  placeStartingBuilding(human, 'TownCenter', gen.playerStart.x, gen.playerStart.y);
+  placeStartingBuilding(ai, 'TownCenter', gen.aiStart.x, gen.aiStart.y);
+
+  for (let i = 0; i < 3; i++) {
+    const ang = (i / 3) * Math.PI * 2;
+    human.units.push(createUnit(human, 'Villager', gen.playerStart.x + Math.cos(ang) * 60, gen.playerStart.y + Math.sin(ang) * 60));
+    ai.units.push(createUnit(ai, 'Villager', gen.aiStart.x + Math.cos(ang) * 60, gen.aiStart.y + Math.sin(ang) * 60));
+  }
+  recalcPopCap(human);
+  recalcPopCap(ai);
+
+  aiState = createAIState(gen.aiStart.x, gen.aiStart.y);
+
+  camera = { x: gen.playerStart.x - window.innerWidth / 2, y: gen.playerStart.y - window.innerHeight / 2 };
+  clampCamera();
+  selection = [];
+  placement = null;
+  uiTimer = 0;
+  gameOverOverlay.classList.add('hidden');
+  refreshUI();
+}
+
+function clampCamera() {
+  const worldW = state.map.w * TILE;
+  const worldH = state.map.h * TILE;
+  camera.x = Math.max(-100, Math.min(worldW - canvas.width + 100, camera.x));
+  camera.y = Math.max(-100, Math.min(worldH - canvas.height + 100, camera.y));
+}
+
+function screenToWorld(sx, sy) {
+  return { x: sx + camera.x, y: sy + camera.y };
+}
+
+function pickEntity(wx, wy) {
+  let bestUnit = null;
+  let bestUD = Infinity;
+  for (const p of state.players) {
+    for (const u of p.units) {
+      const d = Math.hypot(u.x - wx, u.y - wy);
+      if (d <= u.radius + 4 && d < bestUD) {
+        bestUD = d;
+        bestUnit = u;
+      }
+    }
+  }
+  if (bestUnit) return { kind: 'unit', ref: bestUnit };
+  for (const p of state.players) {
+    for (const b of p.buildings) {
+      const r = buildingRadius(b);
+      if (Math.abs(b.x - wx) <= r && Math.abs(b.y - wy) <= r) return { kind: 'building', ref: b };
+    }
+  }
+  for (const r of state.map.resources) {
+    const d = Math.hypot(r.x - wx, r.y - wy);
+    if (d <= r.radius + 8) return { kind: 'resource', ref: r };
+  }
+  return null;
+}
+
+function handleLeftClickSelect(wx, wy) {
+  const pick = pickEntity(wx, wy);
+  if (pick && pick.kind !== 'resource') {
+    selection = [pick.ref];
+  } else {
+    selection = [];
+  }
+  refreshUI();
+}
+
+function handleBoxSelect(x1, y1, x2, y2) {
+  const minX = Math.min(x1, x2);
+  const maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2);
+  const maxY = Math.max(y1, y2);
+  const found = human.units.filter((u) => u.x >= minX && u.x <= maxX && u.y >= minY && u.y <= maxY);
+  if (found.length > 0) {
+    selection = found;
+  } else {
+    handleLeftClickSelect((minX + maxX) / 2, (minY + maxY) / 2);
+    return;
+  }
+  refreshUI();
+}
+
+function currentLineType(player, root) {
+  return player.unitLine[root] || root;
+}
+
+function handleRightClickCommand(wx, wy) {
+  if (placement) {
+    placement = null;
+    refreshUI();
+    return;
+  }
+  const myUnits = selection.filter((e) => e.kind === 'unit' && e.owner === human);
+  if (myUnits.length === 0) {
+    const myBuilding = selection.find((e) => e.kind === 'building' && e.owner === human && e.def.trains);
+    if (myBuilding) myBuilding.rally = { x: wx, y: wy };
+    return;
+  }
+  const pick = pickEntity(wx, wy);
+  if (pick && pick.kind === 'unit' && pick.ref.owner !== human) {
+    for (const u of myUnits) issueAttack(state.map, u, pick.ref);
+  } else if (pick && pick.kind === 'building' && pick.ref.owner !== human) {
+    for (const u of myUnits) issueAttack(state.map, u, pick.ref);
+  } else if (pick && pick.kind === 'resource') {
+    for (const u of myUnits) {
+      if (u.stats.class === 'villager') issueGather(state.map, u, pick.ref);
+      else issueMove(state.map, u, pick.ref.x, pick.ref.y);
+    }
+  } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.def.isFarm && pick.ref.foodLeft > 0) {
+    for (const u of myUnits) {
+      if (u.stats.class === 'villager') issueGatherFarm(state.map, u, pick.ref);
+    }
+  } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.constructing) {
+    for (const u of myUnits) {
+      if (u.stats.class === 'villager') issueBuild(state.map, u, pick.ref);
+    }
+  } else {
+    let i = 0;
+    const n = myUnits.length;
+    for (const u of myUnits) {
+      const ang = (i / Math.max(1, n)) * Math.PI * 2;
+      const off = n > 1 ? Math.min(28, n * 3) : 0;
+      issueMove(state.map, u, wx + Math.cos(ang) * off, wy + Math.sin(ang) * off);
+      i++;
+    }
+  }
+}
+
+// mousedown 只綁在 canvas 上（面板上按下不該觸發遊戲操作），
+// 但 mousemove/mouseup 綁在 window 上：拖曳框選放開滑鼠時，游標常常已經移到
+// 上/下方的 UI 面板上，若只綁在 canvas 會收不到該事件，導致選取框卡住不消失。
+canvas.addEventListener('mousedown', (e) => {
+  if (state.ended) return;
+  const world = screenToWorld(e.clientX, e.clientY);
+  if (e.button === 0) {
+    if (placement) {
+      tryPlaceBuilding(world.x, world.y);
+      return;
+    }
+    dragStart = { x: e.clientX, y: e.clientY };
+    dragCurrent = dragStart;
+  } else if (e.button === 2) {
+    handleRightClickCommand(world.x, world.y);
+  }
+});
+window.addEventListener('mousemove', (e) => {
+  mouseWorld = screenToWorld(e.clientX, e.clientY);
+  if (dragStart) dragCurrent = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('mouseup', (e) => {
+  if (e.button !== 0) return;
+  if (placement) return;
+  if (dragStart) {
+    const dx = Math.abs(dragCurrent.x - dragStart.x);
+    const dy = Math.abs(dragCurrent.y - dragStart.y);
+    const w1 = screenToWorld(dragStart.x, dragStart.y);
+    const w2 = screenToWorld(dragCurrent.x, dragCurrent.y);
+    if (dx > 6 || dy > 6) {
+      handleBoxSelect(w1.x, w1.y, w2.x, w2.y);
+    } else {
+      handleLeftClickSelect(w1.x, w1.y);
+    }
+  }
+  dragStart = null;
+  dragCurrent = null;
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+window.addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'Escape') {
+    placement = null;
+    refreshUI();
+  }
+});
+window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+function tryPlaceBuilding(wx, wy) {
+  const def = BUILDINGS[placement.type];
+  const { tx, ty } = state.map.worldToTile(wx, wy);
+  const c = state.map.tileCenter(tx, ty);
+  if (!state.map.canPlaceFootprint(c.x, c.y, def.size)) return;
+  if (!human.canAfford(def.cost)) return;
+  const b = startBuildingConstruction(state, human, placement.type, c.x, c.y);
+  if (!b) return;
+  const builders = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
+  for (const v of builders) issueBuild(state.map, v, b);
+  placement = null;
+  refreshUI();
+}
+
+function panCamera(dt) {
+  const speed = 480 * dt;
+  if (keys['w'] || keys['arrowup']) camera.y -= speed;
+  if (keys['s'] || keys['arrowdown']) camera.y += speed;
+  if (keys['a'] || keys['arrowleft']) camera.x -= speed;
+  if (keys['d'] || keys['arrowright']) camera.x += speed;
+  clampCamera();
+}
+
+function update(dt) {
+  state.time += dt;
+  for (const p of state.players) {
+    const unitsCopy = p.units.slice();
+    for (const u of unitsCopy) updateUnit(state, u, dt);
+    const buildingsCopy = p.buildings.slice();
+    for (const b of buildingsCopy) updateBuilding(state, p, b, dt);
+    updatePlayerAge(p, dt);
+    recalcPopCap(p);
+  }
+  updateProjectiles(state, dt);
+  updateAI(state, ai, aiState, human, dt);
+
+  selection = selection.filter((e) => (e.kind === 'unit' ? e.owner.units.includes(e) : e.owner.buildings.includes(e)));
+
+  if (!state.ended) {
+    const humanAlive = human.buildings.length > 0 || human.units.length > 0;
+    const aiAlive = ai.buildings.length > 0 || ai.units.length > 0;
+    if (!humanAlive) { state.ended = true; state.winner = ai; }
+    else if (!aiAlive) { state.ended = true; state.winner = human; }
+    if (state.ended) showGameOver();
+  }
+
+  uiTimer -= dt;
+  if (uiTimer <= 0) {
+    uiTimer = 0.25;
+    refreshUI();
+  }
+}
+
+function showGameOver() {
+  gameOverText.textContent = state.winner === human ? '勝利！你征服了對手' : '戰敗……基地已被摧毀';
+  gameOverOverlay.classList.remove('hidden');
+}
+restartBtn.addEventListener('click', () => { initGame(); });
+
+function drawResourceNode(r) {
+  const sx = r.x - camera.x;
+  const sy = r.y - camera.y;
+  if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
+  const ratio = r.amount / r.maxAmount;
+  if (r.type === 'wood') {
+    ctx.fillStyle = `rgba(40,90,45,${0.5 + 0.5 * ratio})`;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 14);
+    ctx.lineTo(sx - 11, sy + 9);
+    ctx.lineTo(sx + 11, sy + 9);
+    ctx.closePath();
+    ctx.fill();
+  } else if (r.type === 'gold') {
+    ctx.fillStyle = `rgba(212,175,55,${0.5 + 0.5 * ratio})`;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 10);
+    ctx.lineTo(sx + 10, sy);
+    ctx.lineTo(sx, sy + 10);
+    ctx.lineTo(sx - 10, sy);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillStyle = `rgba(180,50,60,${0.5 + 0.5 * ratio})`;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function ownerColor(owner, alt) {
+  if (owner.id === 0) return alt ? '#1d4ed8' : '#3b82f6';
+  return alt ? '#b91c1c' : '#ef4444';
+}
+
+function drawHpBar(sx, sy, width, ratio, selected) {
+  ctx.fillStyle = '#200';
+  ctx.fillRect(sx - width / 2, sy, width, 5);
+  ctx.fillStyle = ratio > 0.5 ? '#4caf50' : ratio > 0.25 ? '#e6b800' : '#e53935';
+  ctx.fillRect(sx - width / 2, sy, width * Math.max(0, ratio), 5);
+  if (selected) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx - width / 2, sy, width, 5);
+  }
+}
+
+function drawBuilding(b) {
+  const sx = b.x - camera.x;
+  const sy = b.y - camera.y;
+  const half = (b.sizeTiles * TILE) / 2;
+  if (sx < -half - 40 || sy < -half - 40 || sx > canvas.width + 40 || sy > canvas.height + 40) return;
+  const isSel = selection.includes(b);
+  ctx.globalAlpha = b.constructing ? 0.55 : 1;
+  ctx.fillStyle = ownerColor(b.owner, true);
+  ctx.strokeStyle = isSel ? '#ffe066' : '#1a1a1a';
+  ctx.lineWidth = isSel ? 3 : 2;
+  ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+  ctx.strokeRect(sx - half, sy - half, half * 2, half * 2);
+  ctx.globalAlpha = 1;
+  ctx.font = `${Math.min(22, half)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(BUILD_ICON[b.type] || '?', sx, sy);
+  drawHpBar(sx, sy - half - 10, half * 1.6, b.hp / b.maxHp, isSel);
+  if (b.constructing) {
+    ctx.fillStyle = '#ffe066';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('建造中', sx, sy + half + 10);
+  }
+  if (b.research) {
+    const ratio = 1 - b.research.timeLeft / b.research.total;
+    ctx.fillStyle = '#7cc7ff';
+    ctx.fillRect(sx - half, sy + half + 4, half * 2 * ratio, 4);
+  }
+  if (b.flashTimer > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+  }
+}
+
+function drawUnit(u) {
+  const sx = u.x - camera.x;
+  const sy = u.y - camera.y;
+  if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
+  const isSel = selection.includes(u);
+  ctx.beginPath();
+  ctx.arc(sx, sy, u.radius, 0, Math.PI * 2);
+  ctx.fillStyle = ownerColor(u.owner);
+  ctx.fill();
+  ctx.strokeStyle = isSel ? '#ffe066' : '#111';
+  ctx.lineWidth = isSel ? 3 : 1.5;
+  ctx.stroke();
+  if (u.flashTimer > 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fill();
+  }
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(UNIT_LABEL[u.type] || '?', sx, sy + 1);
+  if (u.hp < u.maxHp || isSel) drawHpBar(sx, sy - u.radius - 9, u.radius * 2.2, u.hp / u.maxHp, isSel);
+  if (u.carry.amount > 0) {
+    ctx.fillStyle = u.carry.type === 'wood' ? '#3a6b30' : u.carry.type === 'gold' ? '#d4af37' : '#c0392b';
+    ctx.beginPath();
+    ctx.arc(sx + u.radius * 0.7, sy - u.radius * 0.7, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawProjectile(p) {
+  const sx = p.x - camera.x;
+  const sy = p.y - camera.y;
+  ctx.fillStyle = '#3a2a10';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPlacementGhost() {
+  if (!placement) return;
+  const def = BUILDINGS[placement.type];
+  const { tx, ty } = state.map.worldToTile(mouseWorld.x, mouseWorld.y);
+  const c = state.map.tileCenter(tx, ty);
+  const sx = c.x - camera.x;
+  const sy = c.y - camera.y;
+  const half = (def.size * TILE) / 2;
+  const valid = state.map.canPlaceFootprint(c.x, c.y, def.size) && human.canAfford(def.cost);
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = valid ? '#4caf50' : '#e53935';
+  ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+  ctx.globalAlpha = 1;
+}
+
+function drawSelectionBox() {
+  if (!dragStart || !dragCurrent) return;
+  const dx = Math.abs(dragCurrent.x - dragStart.x);
+  const dy = Math.abs(dragCurrent.y - dragStart.y);
+  if (dx < 6 && dy < 6) return;
+  ctx.strokeStyle = '#ffe066';
+  ctx.lineWidth = 1.5;
+  const x = Math.min(dragStart.x, dragCurrent.x);
+  const y = Math.min(dragStart.y, dragCurrent.y);
+  ctx.strokeRect(x, y, dx, dy);
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#3a5f2b';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  const startTx = Math.floor(camera.x / TILE);
+  const startTy = Math.floor(camera.y / TILE);
+  for (let tx = startTx; tx < startTx + canvas.width / TILE + 2; tx++) {
+    const sx = tx * TILE - camera.x;
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height); ctx.stroke();
+  }
+  for (let ty = startTy; ty < startTy + canvas.height / TILE + 2; ty++) {
+    const sy = ty * TILE - camera.y;
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
+  }
+
+  for (const r of state.map.resources) drawResourceNode(r);
+  for (const p of state.players) for (const b of p.buildings) drawBuilding(b);
+  for (const p of state.players) for (const u of p.units) drawUnit(u);
+  for (const pr of state.projectiles) drawProjectile(pr);
+  drawPlacementGhost();
+  drawSelectionBox();
+}
+
+function ageLabel(ageId) {
+  return AGES[ageId].name;
+}
+
+function buildBuildingButtons(container) {
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = '建造建築物';
+  container.appendChild(label);
+  const options = ['House', 'Barracks', 'Farm'];
+  if (human.age >= 1) options.push('ArcheryRange', 'Stable', 'Blacksmith', 'LumberCamp', 'MiningCamp');
+  for (const type of options) {
+    const def = BUILDINGS[type];
+    const btn = document.createElement('div');
+    const affordable = human.canAfford(def.cost);
+    btn.className = 'actBtn' + (affordable ? '' : ' disabled');
+    btn.innerHTML = `<div class="icon">${BUILD_ICON[type]}</div><div>${def.name}</div><div class="cost">${costText(def.cost)}</div>`;
+    btn.onclick = () => {
+      if (!human.canAfford(def.cost)) return;
+      placement = { type };
+    };
+    container.appendChild(btn);
+  }
+}
+
+function trainButton(container, building, rootOrType, isRoot) {
+  const type = isRoot ? currentLineType(human, rootOrType) : rootOrType;
+  const def = UNITS[type];
+  if (!def) return;
+  if (def.requiresAge !== undefined && human.age < def.requiresAge) return;
+  const affordable = human.canAfford(def.cost || {}) && building.trainQueue.length < 10;
+  const btn = document.createElement('div');
+  btn.className = 'actBtn' + (affordable ? '' : ' disabled');
+  btn.innerHTML = `<div class="icon">${UNIT_ICON[type]}</div><div>${def.name}</div><div class="cost">${costText(def.cost)}</div>`;
+  if (building.trainQueue.length > 0 && building.trainQueue[0].type === type) {
+    const ratio = building.trainProgress / building.trainQueue[0].totalTime;
+    btn.innerHTML += `<div class="miniProgress" style="width:${ratio * 100}%"></div>`;
+  }
+  const sameQueued = building.trainQueue.filter((q) => q.type === type).length;
+  if (sameQueued > 0) btn.innerHTML += `<div class="queueBadge">${sameQueued}</div>`;
+  btn.onclick = () => { startTraining(human, building, type); refreshUI(); };
+  container.appendChild(btn);
+}
+
+function upgradeButton(container, building, upgradeKey) {
+  const up = UNIT_UPGRADES[upgradeKey];
+  if (human.age < up.requiresAge) return;
+  if (building.research) return;
+  const affordable = human.canAfford(up.cost);
+  const btn = document.createElement('div');
+  btn.className = 'actBtn' + (affordable ? '' : ' disabled');
+  btn.innerHTML = `<div class="icon">⬆️</div><div>${up.name}</div><div class="cost">${costText(up.cost)}</div>`;
+  btn.onclick = () => { startUnitUpgrade(human, building, upgradeKey); refreshUI(); };
+  container.appendChild(btn);
+}
+
+function techButton(container, building, key) {
+  const tech = TECHS[key];
+  if (human.age < tech.requiresAge) return;
+  if (human.techsResearched.has(key)) return;
+  if (building.research) return;
+  const affordable = human.canAfford(tech.cost);
+  const btn = document.createElement('div');
+  btn.className = 'actBtn' + (affordable ? '' : ' disabled');
+  btn.innerHTML = `<div class="icon">🧪</div><div>${tech.name}</div><div class="cost">${costText(tech.cost)}</div>`;
+  btn.onclick = () => { startResearchTech(human, building, key); refreshUI(); };
+  container.appendChild(btn);
+}
+
+function buildAgeUpButton(container, building) {
+  const nextAge = AGES[human.age + 1];
+  if (!nextAge) return;
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = '時代升級';
+  container.appendChild(label);
+  const btn = document.createElement('div');
+  const affordable = human.canAfford(nextAge.nextCost) && !human.ageResearch;
+  btn.className = 'actBtn' + (affordable ? '' : ' disabled');
+  btn.innerHTML = `<div class="icon">⏫</div><div>晉級：${nextAge.name}</div><div class="cost">${costText(nextAge.nextCost)}</div>`;
+  if (human.ageResearch) {
+    const ratio = 1 - human.ageResearch.timeLeft / human.ageResearch.total;
+    btn.innerHTML += `<div class="miniProgress" style="width:${ratio * 100}%"></div>`;
+  }
+  btn.onclick = () => { startAgeUp(human); refreshUI(); };
+  container.appendChild(btn);
+}
+
+function refreshActionButtons() {
+  actionButtonsEl.innerHTML = '';
+  const myBuildings = selection.filter((e) => e.kind === 'building' && e.owner === human);
+  const myVillagers = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
+
+  if (myBuildings.length === 1) {
+    const b = myBuildings[0];
+    if (b.constructing) {
+      const info = document.createElement('div');
+      info.className = 'sectionLabel';
+      info.textContent = '建築物興建中，需要村民協助施工';
+      actionButtonsEl.appendChild(info);
+    } else {
+      if (b.def.trains) {
+        const label = document.createElement('div');
+        label.className = 'sectionLabel';
+        label.textContent = '訓練單位';
+        actionButtonsEl.appendChild(label);
+        for (const slot of b.def.trains) {
+          const isRoot = Object.prototype.hasOwnProperty.call(human.unitLine, slot);
+          trainButton(actionButtonsEl, b, slot, isRoot);
+        }
+        const upKeys = Object.keys(UNIT_UPGRADES).filter((key) => {
+          const up = UNIT_UPGRADES[key];
+          if (up.building !== b.type) return false;
+          return Object.values(human.unitLine).includes(up.from);
+        });
+        if (upKeys.length > 0) {
+          const upLabel = document.createElement('div');
+          upLabel.className = 'sectionLabel';
+          upLabel.textContent = '兵種升級';
+          actionButtonsEl.appendChild(upLabel);
+          for (const key of upKeys) upgradeButton(actionButtonsEl, b, key);
+        }
+      }
+      if (b.def.researches) {
+        const label = document.createElement('div');
+        label.className = 'sectionLabel';
+        label.textContent = '科技研究';
+        actionButtonsEl.appendChild(label);
+        for (const key of b.def.researches) techButton(actionButtonsEl, b, key);
+      }
+      if (b.def.canAgeUp) buildAgeUpButton(actionButtonsEl, b);
+    }
+  }
+
+  if (myVillagers.length > 0 && myBuildings.length === 0) {
+    buildBuildingButtons(actionButtonsEl);
+  }
+
+  if (myBuildings.length === 0 && myVillagers.length === 0 && selection.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'sectionLabel';
+    hint.textContent = '選取單位或建築以查看可用指令';
+    actionButtonsEl.appendChild(hint);
+  }
+}
+
+function refreshSelectionInfo() {
+  selectionInfoEl.innerHTML = '';
+  if (selection.length === 0) {
+    selectionInfoEl.innerHTML = '<div class="placeholder">尚未選取任何單位或建築</div>';
+    return;
+  }
+  if (selection.length === 1) {
+    const e = selection[0];
+    if (e.kind === 'unit') {
+      const stats = effectiveStats(e);
+      selectionInfoEl.innerHTML = `
+        <div class="name">${UNIT_ICON[e.type] || ''} ${stats.name}${e.owner.isAI ? '（敵方）' : ''}</div>
+        <div class="hpbar"><div class="fill" style="width:${(e.hp / e.maxHp) * 100}%"></div></div>
+        <div class="stats">
+          <span>HP ${Math.ceil(e.hp)}/${e.maxHp}</span>
+          <span>攻擊 ${stats.attack}</span>
+          <span>護甲 ${stats.armor}</span>
+          <span>射程 ${(stats.range / TILE).toFixed(1)}格</span>
+        </div>`;
+    } else {
+      let extra = '';
+      if (e.trainQueue && e.trainQueue.length > 0) {
+        extra += `<div>訓練佇列：${e.trainQueue.map((q) => UNITS[q.type].name).join('、')}</div>`;
+      }
+      if (e.research) {
+        const rname = e.research.kind === 'tech' ? TECHS[e.research.key].name : UNIT_UPGRADES[e.research.key].name;
+        extra += `<div>研究中：${rname}（剩 ${e.research.timeLeft.toFixed(1)}s）</div>`;
+      }
+      if (e.def.isFarm) extra += `<div>剩餘食物：${Math.ceil(e.foodLeft || 0)}</div>`;
+      selectionInfoEl.innerHTML = `
+        <div class="name">${BUILD_ICON[e.type] || ''} ${e.def.name}${e.owner.isAI ? '（敵方）' : ''}</div>
+        <div class="hpbar"><div class="fill" style="width:${(e.hp / e.maxHp) * 100}%"></div></div>
+        <div class="stats"><span>HP ${Math.ceil(e.hp)}/${e.maxHp}</span></div>
+        ${extra}`;
+    }
+    return;
+  }
+  const counts = {};
+  for (const e of selection) {
+    const key = e.kind === 'unit' ? e.type : e.type;
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  let html = `<div class="name">已選取 ${selection.length} 個單位</div>`;
+  for (const k in counts) {
+    const nm = UNITS[k] ? UNITS[k].name : (BUILDINGS[k] ? BUILDINGS[k].name : k);
+    html += `<div class="groupItem"><span>${nm}</span><span>${counts[k]}</span></div>`;
+  }
+  selectionInfoEl.innerHTML = html;
+}
+
+function refreshTopbar() {
+  topbarEls.wood.textContent = Math.floor(human.resources.wood);
+  topbarEls.food.textContent = Math.floor(human.resources.food);
+  topbarEls.gold.textContent = Math.floor(human.resources.gold);
+  topbarEls.pop.textContent = `${human.currentPop()}/${human.popCap}`;
+  topbarEls.ageName.textContent = ageLabel(human.age);
+  if (human.ageResearch) {
+    topbarEls.ageProgressWrap.classList.remove('hidden');
+    const ratio = 1 - human.ageResearch.timeLeft / human.ageResearch.total;
+    topbarEls.ageProgressFill.style.width = `${ratio * 100}%`;
+  } else {
+    topbarEls.ageProgressWrap.classList.add('hidden');
+  }
+}
+
+function refreshUI() {
+  refreshTopbar();
+  refreshSelectionInfo();
+  refreshActionButtons();
+}
+
+let lastTs = null;
+function frame(ts) {
+  if (lastTs === null) lastTs = ts;
+  let dt = (ts - lastTs) / 1000;
+  lastTs = ts;
+  dt = Math.min(dt, 0.05);
+  if (!state.ended) {
+    panCamera(dt);
+    update(dt);
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+resizeCanvas();
+initGame();
+requestAnimationFrame(frame);
+
+  </script>
 </body>
 </html>

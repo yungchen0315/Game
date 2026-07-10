@@ -2737,34 +2737,43 @@ function screenToWorld(sx, sy) {
   return { x: sx / zoom + camera.x, y: sy / zoom + camera.y };
 }
 
+// 觸控容錯半徑要換算成「螢幕像素」再依目前縮放換回世界座標，否則縮小視角看整張地圖時，
+// 固定的世界座標容錯量在螢幕上會變得很小，單位（尤其是村民）就會變得很難點到。
+function tapToleranceWorld(px) {
+  return px / zoom;
+}
+
 function pickEntity(wx, wy) {
   let bestUnit = null;
   let bestUD = Infinity;
+  const unitPad = tapToleranceWorld(16);
   for (const p of state.players) {
     for (const u of p.units) {
       if (!shouldRenderEntity(state, u)) continue;
       const d = Math.hypot(u.x - wx, u.y - wy);
-      if (d <= u.radius + 4 && d < bestUD) {
+      if (d <= u.radius + unitPad && d < bestUD) {
         bestUD = d;
         bestUnit = u;
       }
     }
   }
   if (bestUnit) return { kind: 'unit', ref: bestUnit };
+  const buildingPad = tapToleranceWorld(6);
   for (const p of state.players) {
     for (const b of p.buildings) {
       if (!shouldRenderEntity(state, b)) continue;
-      const r = buildingRadius(b);
+      const r = buildingRadius(b) + buildingPad;
       if (Math.abs(b.x - wx) <= r && Math.abs(b.y - wy) <= r) return { kind: 'building', ref: b };
     }
   }
+  const resourcePad = tapToleranceWorld(10);
   for (const r of state.map.resources) {
     const d = Math.hypot(r.x - wx, r.y - wy);
-    if (d <= r.radius + 8) return { kind: 'resource', ref: r };
+    if (d <= r.radius + resourcePad) return { kind: 'resource', ref: r };
   }
   for (const relic of state.map.relics) {
     const d = Math.hypot(relic.x - wx, relic.y - wy);
-    if (d <= relic.radius + 8) return { kind: 'relic', ref: relic };
+    if (d <= relic.radius + resourcePad) return { kind: 'relic', ref: relic };
   }
   return null;
 }
@@ -2808,6 +2817,10 @@ function commandAtPoint(wx, wy) {
   if (myUnits.length === 0) {
     const myBuilding = selection.find((e) => e.kind === 'building' && e.owner === human && e.def.trains);
     if (myBuilding) myBuilding.rally = { x: wx, y: wy };
+    // 只有訓練建築（主城/兵營等）被選取、沒有單位時，點地圖只會設定集結點，
+    // 但不清掉選取的話畫面就永遠停在該建築的資訊面板上退不出去——
+    // 點完地圖後直接取消選取，讓玩家可以用「點地圖任意處」離開該畫面。
+    selection = [];
     return;
   }
   const monks = myUnits.filter((u) => u.stats.class === 'monk');
@@ -3742,16 +3755,16 @@ function drawFogOfWar() {
   const startTy = Math.max(0, Math.floor(camera.y / TILE));
   const endTx = Math.min(map.w, Math.ceil((camera.x + viewW()) / TILE) + 1);
   const endTy = Math.min(map.h, Math.ceil((camera.y + viewH()) / TILE) + 1);
+  // 只用「探索過／沒探索過」兩段式：探索過的地形一律完全顯示，不再額外疊一層
+  // 灰色暗紗——先前疊暗紗的做法會讓玩家覺得「明明探索過了，怎麼還跟著單位
+  // 移動冒出一塊灰色」。敵方單位是否顯示仍由 visibleNow 控制（見 shouldRenderEntity），
+  // 不受這裡簡化的影響。
   for (let ty = startTy; ty < endTy; ty++) {
     const rowBase = ty * map.w;
     for (let tx = startTx; tx < endTx; tx++) {
       const idx = rowBase + tx;
-      const explored = map.explored[idx];
-      const visible = map.visibleNow[idx];
-      if (visible) continue;
-      // 已探索但目前不在視野內的地形，用比較淡、偏暖色調的暗紗取代死板的灰色，
-      // 看起來像「記憶中略暗的地形」而不是一塊突然冒出來的灰色陰影。
-      ctx.fillStyle = explored ? 'rgba(18,22,10,0.38)' : 'rgba(4,7,3,0.96)';
+      if (map.explored[idx]) continue;
+      ctx.fillStyle = 'rgba(4,7,3,0.96)';
       ctx.fillRect(tx * TILE - camera.x, ty * TILE - camera.y, TILE + 1, TILE + 1);
     }
   }

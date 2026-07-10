@@ -1275,7 +1275,6 @@ function createBuilding(owner, type, x, y, opts = {}) {
     def,
     sizeTiles: def.size,
     constructing,
-    builders: 0,
     trainQueue: [],
     trainProgress: 0,
     research: null,
@@ -1287,6 +1286,7 @@ function createBuilding(owner, type, x, y, opts = {}) {
   if (def.isGate) building.open = false;
   if (def.isWonder) building.wonderActive = false;
   if (def.relicDropOff) building.relicsHeld = 0;
+  if (def.isFarm) building.worker = null;
   return building;
 }
 
@@ -1420,14 +1420,13 @@ function issueGather(map, unit, resource) {
   pathTo(map, unit, resource.x, resource.y);
 }
 
-function issueGatherFarm(map, unit, farm) {
-  unit.task = { type: 'gatherFarm', farm, phase: 'toFarm' };
-  pathTo(map, unit, farm.x, farm.y);
-}
-
-function issueBuild(map, unit, building) {
-  unit.task = { type: 'build', building };
-  pathToBuilding(map, unit, building);
+// 農田不再需要村民來回搬運：指派一位村民「進駐」農田後，會自動定期產出食物，
+// 直到農田耗盡為止（每座農田最多同時指派一位村民）。
+function issueFarmWork(map, unit, farm) {
+  if (farm.worker && farm.worker !== unit) return;
+  farm.worker = unit;
+  unit.task = { type: 'farmWork', farm };
+  pathToBuilding(map, unit, farm);
 }
 
 function issueAttack(map, unit, target) {
@@ -1637,89 +1636,32 @@ function updateGatherTask(state, unit, dt) {
   }
 }
 
-function updateGatherFarmTask(state, unit, dt) {
-  const map = state.map;
+// 農田：村民走到後就「進駐」原地工作，食物直接定期存入資源，不用再來回搬運。
+function updateFarmWorkTask(state, unit, dt) {
   const task = unit.task;
-  const stats = effectiveStats(unit);
   const farm = task.farm;
-  if (!farm || farm.hp <= 0 || farm.foodLeft <= 0) {
+  if (!farm || farm.hp <= 0 || farm.foodLeft <= 0 || farm.owner !== unit.owner) {
+    if (farm && farm.worker === unit) farm.worker = null;
     unit.task = null;
     return;
   }
-  if (task.phase === 'toFarm') {
-    const arrived = moveUnitTowardsPath(unit, dt);
-    if (arrived) {
-      const d = buildingProximity(unit, farm);
-      if (d <= buildingRadius(farm) + unit.radius + 6) {
-        task.phase = 'gathering';
-      } else {
-        pathToBuilding(map, unit, farm);
-      }
-    }
-  } else if (task.phase === 'gathering') {
-    const gatherMul = unit.owner.gatherMul.food || 1;
-    const take = Math.min(stats.gatherRate * gatherMul * dt, farm.foodLeft, stats.carryCap - unit.carry.amount);
-    farm.foodLeft -= take;
-    unit.carry.type = 'food';
-    unit.carry.amount += take;
-    if (unit.carry.amount >= stats.carryCap - 0.001 || farm.foodLeft <= 0) {
-      task.phase = 'toDropoff';
-      task.dropoff = findDropOff(unit.owner, 'food', unit.x, unit.y);
-      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
-    }
-  } else if (task.phase === 'toDropoff') {
-    if (!task.dropoff || task.dropoff.hp <= 0) {
-      task.dropoff = findDropOff(unit.owner, 'food', unit.x, unit.y);
-      if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
-      else return;
-    }
-    const arrived = moveUnitTowardsPath(unit, dt);
-    if (arrived) {
-      const d = buildingProximity(unit, task.dropoff);
-      if (d <= buildingRadius(task.dropoff) + unit.radius + 6) {
-        unit.owner.resources.food += unit.carry.amount;
-        unit.carry.amount = 0;
-        if (farm.foodLeft > 0) {
-          task.phase = 'toFarm';
-          pathToBuilding(map, unit, farm);
-        } else {
-          unit.task = null;
-        }
-      } else {
-        pathToBuilding(map, unit, task.dropoff);
-      }
-    }
-  }
-  if (farm.foodLeft <= 0) {
-    removeEntity(state, farm);
-  }
-}
-
-function updateBuildTask(state, unit, dt) {
-  const building = unit.task.building;
-  if (!building || building.hp <= 0) {
-    unit.task = null;
-    return;
-  }
+  if (farm.constructing) return; // 農田還在自動施工中，先在旁邊待命
   const arrived = moveUnitTowardsPath(unit, dt);
-  if (arrived) {
-    const d = buildingProximity(unit, building);
-    if (d > buildingRadius(building) + unit.radius + 8) {
-      pathToBuilding(state.map, unit, building);
-      return;
-    }
-    if (!building.constructing) {
-      unit.task = null;
-      return;
-    }
-    const rate = ((building.maxHp * 0.9) / (building.def.buildTime || 10)) * (unit.owner.buildSpeedMul || 1);
-    building.hp = Math.min(building.maxHp, building.hp + rate * dt);
-    if (building.hp >= building.maxHp) {
-      building.hp = building.maxHp;
-      building.constructing = false;
-      if (building.def.isWonder) startWonderCountdown(building.owner, building);
-      unit.task = null;
-    }
+  if (!arrived) return;
+  const d = buildingProximity(unit, farm);
+  if (d > buildingRadius(farm) + unit.radius + 6) {
+    pathToBuilding(state.map, unit, farm);
+    return;
+  }
+  const stats = effectiveStats(unit);
+  const gatherMul = unit.owner.gatherMul.food || 1;
+  const take = Math.min(stats.gatherRate * gatherMul * dt, farm.foodLeft);
+  farm.foodLeft -= take;
+  unit.owner.resources.food += take;
+  if (farm.foodLeft <= 0) {
+    farm.worker = null;
+    unit.task = null;
+    removeEntity(state, farm);
   }
 }
 
@@ -1750,11 +1692,8 @@ function updateUnit(state, unit, dt) {
     case 'gather':
       updateGatherTask(state, unit, dt);
       break;
-    case 'gatherFarm':
-      updateGatherFarmTask(state, unit, dt);
-      break;
-    case 'build':
-      updateBuildTask(state, unit, dt);
+    case 'farmWork':
+      updateFarmWorkTask(state, unit, dt);
       break;
     case 'heal':
       updateHealTask(state, unit, dt);
@@ -1785,25 +1724,41 @@ function spawnTrainedUnit(state, player, building, type) {
 function updateBuilding(state, player, building, dt) {
   if (building.flashTimer > 0) building.flashTimer -= dt;
   if (building.attackCooldown > 0) building.attackCooldown -= dt;
-  if (!building.constructing) {
-    if (building.def.attack) updateDefenseBuildingAttack(state, building, dt);
-    if (building.trainQueue.length > 0) {
-      const item = building.trainQueue[0];
-      if (player.currentPop() < player.popCap) {
-        building.trainProgress += dt;
-        if (building.trainProgress >= item.totalTime) {
-          spawnTrainedUnit(state, player, building, item.type);
-          building.trainQueue.shift();
-          building.trainProgress = 0;
-        }
+  if (building.constructing) {
+    // 自動施工：下單後直接依 buildTime 自動完成，不需要村民在旁邊才會有進度，
+    // 避免手機觸控誤觸導致村民被取消指派、施工看起來卡住不動。
+    const rate = ((building.maxHp * 0.9) / (building.def.buildTime || 10)) * (player.buildSpeedMul || 1);
+    building.hp = Math.min(building.maxHp, building.hp + rate * dt);
+    if (building.hp >= building.maxHp) {
+      building.hp = building.maxHp;
+      building.constructing = false;
+      if (building.def.isWonder) startWonderCountdown(player, building);
+    }
+    return;
+  }
+  if (building.def.isFarm && building.worker) {
+    const w = building.worker;
+    if (!w.task || w.task.type !== 'farmWork' || w.task.farm !== building || w.hp <= 0 || w.owner.units.indexOf(w) < 0) {
+      building.worker = null;
+    }
+  }
+  if (building.def.attack) updateDefenseBuildingAttack(state, building, dt);
+  if (building.trainQueue.length > 0) {
+    const item = building.trainQueue[0];
+    if (player.currentPop() < player.popCap) {
+      building.trainProgress += dt;
+      if (building.trainProgress >= item.totalTime) {
+        spawnTrainedUnit(state, player, building, item.type);
+        building.trainQueue.shift();
+        building.trainProgress = 0;
       }
     }
-    if (building.research) {
-      building.research.timeLeft -= dt;
-      if (building.research.timeLeft <= 0) {
-        applyResearch(player, building.research);
-        building.research = null;
-      }
+  }
+  if (building.research) {
+    building.research.timeLeft -= dt;
+    if (building.research.timeLeft <= 0) {
+      applyResearch(player, building.research);
+      building.research = null;
     }
   }
 }
@@ -2225,7 +2180,7 @@ function countGatherers(ai) {
   const counts = { wood: 0, food: 0, gold: 0 };
   for (const u of ai.units) {
     if (u.task && u.task.type === 'gather') counts[u.task.resourceType]++;
-    else if (u.task && u.task.type === 'gatherFarm') counts.food++;
+    else if (u.task && u.task.type === 'farmWork') counts.food++;
   }
   return counts;
 }
@@ -2256,12 +2211,9 @@ function assignVillager(state, ai, aiState, villager) {
   }
   if (bestType === 'food') {
     for (const b of ai.buildings) {
-      if (b.def.isFarm && !b.constructing && b.foodLeft > 0) {
-        const already = ai.units.filter((u) => u.task && u.task.farm === b).length;
-        if (already < 2) {
-          issueGatherFarm(state.map, villager, b);
-          return;
-        }
+      if (b.def.isFarm && b.foodLeft > 0 && !b.worker) {
+        issueFarmWork(state.map, villager, b);
+        return;
       }
     }
     if (ai.canAfford(BUILDINGS.Farm.cost)) {
@@ -2269,7 +2221,7 @@ function assignVillager(state, ai, aiState, villager) {
       if (spot) {
         const b = startBuildingConstruction(state, ai, 'Farm', spot.x, spot.y);
         if (b) {
-          issueBuild(state.map, villager, b);
+          issueFarmWork(state.map, villager, b);
           return;
         }
       }
@@ -2283,14 +2235,10 @@ function assignVillager(state, ai, aiState, villager) {
 function tryBuild(state, ai, aiState, type) {
   const def = BUILDINGS[type];
   if (!ai.canAfford(def.cost)) return false;
-  const builder = ai.units.find((u) => u.stats.class === 'villager' && (!u.task || u.task.type === 'gather' || u.task.type === 'gatherFarm'));
-  if (!builder) return false;
   const spot = findBuildSpot(state.map, aiState.homeX, aiState.homeY, def.size);
   if (!spot) return false;
   const b = startBuildingConstruction(state, ai, type, spot.x, spot.y);
-  if (!b) return false;
-  issueBuild(state.map, builder, b);
-  return true;
+  return !!b;
 }
 
 function has(ai, type) {
@@ -2851,9 +2799,11 @@ function commandAtPoint(wx, wy) {
     for (const u of villagers) issueGather(state.map, u, pick.ref);
     for (const u of [...combatUnits, ...monks]) issueMove(state.map, u, pick.ref.x, pick.ref.y);
   } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.def.isFarm && pick.ref.foodLeft > 0) {
-    for (const u of villagers) issueGatherFarm(state.map, u, pick.ref);
-  } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.constructing) {
-    for (const u of villagers) issueBuild(state.map, u, pick.ref);
+    const farm = pick.ref;
+    for (const u of villagers) {
+      if (!farm.worker || farm.worker === u) issueFarmWork(state.map, u, farm);
+      else issueMove(state.map, u, farm.x, farm.y);
+    }
   } else {
     let i = 0;
     const n = myUnits.length;
@@ -2873,16 +2823,25 @@ function commandAtPoint(wx, wy) {
 // 雙指拖曳＝平移視角（備用手勢，效果與單指拖曳相同）
 function handleTapCommand(wx, wy) {
   const pick = pickEntity(wx, wy);
-  if (pick && pick.kind !== 'resource' && pick.ref.owner === human) {
-    selection = [pick.ref];
-    refreshUI();
-    return;
-  }
   const myUnits = selection.filter((e) => e.kind === 'unit' && e.owner === human);
   const myTrainingBuilding = selection.find((e) => e.kind === 'building' && e.owner === human && e.def.trains);
-  if (myUnits.length > 0 || myTrainingBuilding) {
+  const hasCommandable = myUnits.length > 0 || !!myTrainingBuilding;
+
+  // 點到「可下令目標」（敵方/資源/聖物/受傷友軍/可進駐的農田/空地）且目前有選取可下令的
+  // 單位或訓練中建築時，一律視為下令，不能被「點到自己的東西就改成選取」蓋掉——
+  // 這是先前農田採集、協助施工常常「點了卻沒反應」的根本原因。
+  const isCommandTarget = !pick
+    || pick.kind === 'resource'
+    || pick.kind === 'relic'
+    || pick.ref.owner !== human
+    || (pick.kind === 'unit' && pick.ref.hp < pick.ref.maxHp)
+    || (pick.kind === 'building' && pick.ref.def.isFarm && pick.ref.foodLeft > 0);
+
+  if (hasCommandable && isCommandTarget) {
     commandAtPoint(wx, wy);
-  } else if (pick && pick.kind !== 'resource') {
+    return;
+  }
+  if (pick && pick.kind !== 'resource') {
     selection = [pick.ref];
     refreshUI();
   } else {
@@ -3054,8 +3013,6 @@ function tryPlaceBuilding(wx, wy) {
   if (!human.canAfford(def.cost)) return;
   const b = startBuildingConstruction(state, human, placement.type, c.x, c.y);
   if (!b) return;
-  const builders = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
-  for (const v of builders) issueBuild(state.map, v, b);
   placement = null;
   refreshUI();
 }
@@ -3530,11 +3487,13 @@ function drawBuilding(b) {
   ctx.font = `${Math.min(22, half)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 3;
+  const icon = BUILD_ICON[b.type] || '?';
+  // 用一次「往右下偏移的深色文字」代替 shadowBlur 做陰影效果——shadowBlur 是軟體模糊，
+  // 建築物一多，每幀都對每個圖示做模糊運算會明顯拖慢畫面（這是流暢度優化的重點之一）。
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillText(icon, sx + 1, sy + half * 0.15 + 1);
   ctx.fillStyle = '#fff';
-  ctx.fillText(BUILD_ICON[b.type] || '?', sx, sy + half * 0.15);
-  ctx.shadowBlur = 0;
+  ctx.fillText(icon, sx, sy + half * 0.15);
 
   drawHpBar(sx, sy - half - 11, half * 1.6, b.hp / b.maxHp, isSel);
   if (b.constructing) {
@@ -3696,17 +3655,21 @@ function render() {
   ctx.fillRect(0, 0, vw + patSize, vh + patSize);
   ctx.restore();
 
+  // 格線改成單一路徑一次性 stroke，避免每格都各自 beginPath/stroke（在建築物多、
+  // 螢幕格數多時，這是每一幀畫面卡頓最主要的成因之一）。
   ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+  ctx.beginPath();
   const startTx = Math.floor(camera.x / TILE);
   const startTy = Math.floor(camera.y / TILE);
   for (let tx = startTx; tx < startTx + vw / TILE + 2; tx++) {
     const sx = tx * TILE - camera.x;
-    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, vh); ctx.stroke();
+    ctx.moveTo(sx, 0); ctx.lineTo(sx, vh);
   }
   for (let ty = startTy; ty < startTy + vh / TILE + 2; ty++) {
     const sy = ty * TILE - camera.y;
-    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(vw, sy); ctx.stroke();
+    ctx.moveTo(0, sy); ctx.lineTo(vw, sy);
   }
+  ctx.stroke();
 
   const drawList = [];
   for (const r of state.map.resources) drawList.push({ y: r.y, draw: () => drawResourceNode(r) });
@@ -3884,6 +3847,28 @@ function buildGateToggleButton(container, building) {
   container.appendChild(btn);
 }
 
+function buildFarmWorkerButton(container, farm) {
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = '農田工作';
+  container.appendChild(label);
+  const btn = document.createElement('div');
+  if (farm.worker) {
+    btn.className = 'actBtn disabled';
+    btn.innerHTML = '<div class="icon">🧑‍🌾</div><div>已有村民耕作中</div>';
+    container.appendChild(btn);
+    return;
+  }
+  const myVillagers = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
+  const candidate = myVillagers[0] || human.units.find((u) => u.stats.class === 'villager');
+  btn.className = 'actBtn' + (candidate ? '' : ' disabled');
+  btn.innerHTML = '<div class="icon">🧑‍🌾</div><div>指派村民耕作</div>';
+  btn.onclick = () => {
+    if (candidate) { issueFarmWork(state.map, candidate, farm); refreshUI(); }
+  };
+  container.appendChild(btn);
+}
+
 function buildStanceButtons(container, units) {
   const label = document.createElement('div');
   label.className = 'sectionLabel';
@@ -3914,7 +3899,9 @@ function refreshActionButtons() {
     if (b.constructing) {
       const info = document.createElement('div');
       info.className = 'sectionLabel';
-      info.textContent = '建築物興建中，需要村民協助施工';
+      const rate = ((b.maxHp * 0.9) / (b.def.buildTime || 10)) * (human.buildSpeedMul || 1);
+      const secLeft = Math.max(0, Math.ceil((b.maxHp - b.hp) / rate));
+      info.textContent = `自動施工中，約 ${secLeft} 秒後完工`;
       actionButtonsEl.appendChild(info);
     } else {
       if (b.def.trains) {
@@ -3949,6 +3936,7 @@ function refreshActionButtons() {
       if (b.def.canAgeUp) buildAgeUpButton(actionButtonsEl, b);
       if (b.type === 'Market') buildTradeButtons(actionButtonsEl);
       if (b.def.isGate) buildGateToggleButton(actionButtonsEl, b);
+      if (b.def.isFarm) buildFarmWorkerButton(actionButtonsEl, b);
     }
   }
 
@@ -3996,7 +3984,12 @@ function refreshSelectionInfo() {
         const rname = e.research.kind === 'tech' ? TECHS[e.research.key].name : UNIT_UPGRADES[e.research.key].name;
         extra += `<div>研究中：${rname}（剩 ${e.research.timeLeft.toFixed(1)}s）</div>`;
       }
-      if (e.def.isFarm) extra += `<div>剩餘食物：${Math.ceil(e.foodLeft || 0)}</div>`;
+      if (e.def.isFarm) {
+        extra += `<div>剩餘食物：${Math.ceil(e.foodLeft || 0)}</div>`;
+        extra += e.constructing
+          ? '<div>耕作狀態：自動施工中</div>'
+          : `<div>耕作狀態：${e.worker ? '有村民自動耕作中' : '尚未指派村民'}</div>`;
+      }
       if (e.def.relicDropOff) extra += `<div>存放聖物：${e.relicsHeld || 0} 個</div>`;
       if (e.def.isGate) extra += `<div>城門狀態：${e.open ? '開啟' : '關閉'}</div>`;
       if (e.def.isWonder) {

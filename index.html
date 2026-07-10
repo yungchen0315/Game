@@ -31,7 +31,7 @@ html, body {
 
 #game {
   position: fixed; inset: 0; display: block;
-  background: #3a5f2b; cursor: default;
+  background: #3a5f2b;
   touch-action: none;
 }
 
@@ -66,10 +66,6 @@ html, body {
 #topbar .icon { font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6)); }
 #topbar .ageInfo { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-right: 4px; }
 #topbar .ageInfo #ageName { font-weight: bold; color: var(--gold-bright); text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
-#topbar .hint { display: none; }
-@media (min-width: 760px) {
-  #topbar .hint { display: block; margin-left: 14px; font-size: 11px; color: #a9967a; white-space: nowrap; }
-}
 
 .progressbar { width: 84px; height: 9px; background: #1a1208; border-radius: 5px; overflow: hidden; border: 1px solid #000; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
 .progressbar .fill { height: 100%; background: linear-gradient(90deg,var(--gold),var(--gold-bright)); width: 0%; box-shadow: 0 0 6px rgba(232,193,74,0.7); }
@@ -101,7 +97,17 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  transition: height 0.18s ease;
+  overflow: hidden;
 }
+/* 沒有選取任何東西、也不在建造模式時，把面板收合成一條細長列，
+   讓地圖畫面盡量佔滿整個螢幕（手機橫向可視高度本來就很有限）。 */
+#bottompanel.collapsed {
+  height: clamp(30px, 6vh, 38px);
+}
+#bottompanel.collapsed #selectionInfo,
+#bottompanel.collapsed #actionButtons { opacity: 0; pointer-events: none; }
+#selectionInfo, #actionButtons { transition: opacity 0.12s ease; }
 #selectionInfo {
   width: clamp(150px, 26vw, 280px); flex-shrink: 0;
   padding: 8px 10px; border-right: 1px solid rgba(255,255,255,0.08);
@@ -185,7 +191,6 @@ html, body {
       <span id="ageName">黑暗時代</span>
       <div id="ageProgressWrap" class="progressbar hidden"><div id="ageProgressFill" class="fill"></div></div>
     </div>
-    <div class="hint">滑鼠左鍵選取／拖曳框選　右鍵下命令　方向鍵/WASD 移動視角　（觸控：點擊選取/下令、拖曳框選、雙指拖曳平移視角）</div>
   </div>
 
   <button id="placementCancelBtn">✕ 取消建造</button>
@@ -1594,6 +1599,7 @@ const gameOverOverlay = document.getElementById('gameOverOverlay');
 const gameOverText = document.getElementById('gameOverText');
 const restartBtn = document.getElementById('restartBtn');
 const placementCancelBtn = document.getElementById('placementCancelBtn');
+const bottompanelEl = document.getElementById('bottompanel');
 
 const BUILD_ICON = {
   TownCenter: '🏛️', House: '🏠', Barracks: '⚔️', ArcheryRange: '🏹', Stable: '🐎',
@@ -1606,16 +1612,40 @@ const UNIT_ICON = {
 let state, human, ai, aiState, camera, selection, placement, uiTimer;
 let dragStart = null;
 let dragCurrent = null;
-let mouseWorld = { x: 0, y: 0 };
-const keys = {};
+let pointerWorld = { x: 0, y: 0 };
 
 function costText(cost) {
   return Object.entries(cost || {}).map(([k, v]) => `${k === 'wood' ? '木' : k === 'food' ? '食' : '金'}${v}`).join(' ');
 }
 
+// 相機縮放：依畫面大小自動計算，確保無論手機螢幕多小、UI 面板佔掉多少空間，
+// 畫面中至少能看到足夠寬廣的地圖範圍（參考手機帝國類遊戲的地圖可視範圍設計），
+// 避免視角過度貼近導致難以掌握全局、找不到路。
+let zoom = 1;
+const TARGET_TILES_X = 20;
+const TARGET_TILES_Y = 11;
+
+function estimateChromeHeight() {
+  const topbarH = Math.min(48, Math.max(38, canvas.height * 0.07));
+  const bottomExpandedH = Math.min(190, Math.max(112, canvas.height * 0.24));
+  return { topbarH, bottomExpandedH };
+}
+
+function computeZoom() {
+  const { topbarH, bottomExpandedH } = estimateChromeHeight();
+  const availW = canvas.width;
+  const availH = Math.max(120, canvas.height - topbarH - bottomExpandedH);
+  zoom = Math.min(availW / (TARGET_TILES_X * TILE), availH / (TARGET_TILES_Y * TILE));
+  zoom = Math.max(0.5, Math.min(1.2, zoom));
+}
+
+function viewW() { return canvas.width / zoom; }
+function viewH() { return canvas.height / zoom; }
+
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  computeZoom();
   if (camera) clampCamera();
 }
 window.addEventListener('resize', resizeCanvas);
@@ -1647,7 +1677,7 @@ function initGame() {
 
   aiState = createAIState(gen.aiStart.x, gen.aiStart.y);
 
-  camera = { x: gen.playerStart.x - window.innerWidth / 2, y: gen.playerStart.y - window.innerHeight / 2 };
+  camera = { x: gen.playerStart.x - viewW() / 2, y: gen.playerStart.y - viewH() / 2 };
   clampCamera();
   selection = [];
   placement = null;
@@ -1659,12 +1689,12 @@ function initGame() {
 function clampCamera() {
   const worldW = state.map.w * TILE;
   const worldH = state.map.h * TILE;
-  camera.x = Math.max(-100, Math.min(worldW - canvas.width + 100, camera.x));
-  camera.y = Math.max(-100, Math.min(worldH - canvas.height + 100, camera.y));
+  camera.x = Math.max(-100, Math.min(worldW - viewW() + 100, camera.x));
+  camera.y = Math.max(-100, Math.min(worldH - viewH() + 100, camera.y));
 }
 
 function screenToWorld(sx, sy) {
-  return { x: sx + camera.x, y: sy + camera.y };
+  return { x: sx / zoom + camera.x, y: sy / zoom + camera.y };
 }
 
 function pickEntity(wx, wy) {
@@ -1693,7 +1723,7 @@ function pickEntity(wx, wy) {
   return null;
 }
 
-function handleLeftClickSelect(wx, wy) {
+function selectAtPoint(wx, wy) {
   const pick = pickEntity(wx, wy);
   if (pick && pick.kind !== 'resource') {
     selection = [pick.ref];
@@ -1712,7 +1742,7 @@ function handleBoxSelect(x1, y1, x2, y2) {
   if (found.length > 0) {
     selection = found;
   } else {
-    handleLeftClickSelect((minX + maxX) / 2, (minY + maxY) / 2);
+    selectAtPoint((minX + maxX) / 2, (minY + maxY) / 2);
     return;
   }
   refreshUI();
@@ -1722,7 +1752,7 @@ function currentLineType(player, root) {
   return player.unitLine[root] || root;
 }
 
-function handleRightClickCommand(wx, wy) {
+function commandAtPoint(wx, wy) {
   if (placement) {
     placement = null;
     refreshUI();
@@ -1764,56 +1794,11 @@ function handleRightClickCommand(wx, wy) {
   }
 }
 
-// mousedown 只綁在 canvas 上（面板上按下不該觸發遊戲操作），
-// 但 mousemove/mouseup 綁在 window 上：拖曳框選放開滑鼠時，游標常常已經移到
-// 上/下方的 UI 面板上，若只綁在 canvas 會收不到該事件，導致選取框卡住不消失。
-canvas.addEventListener('mousedown', (e) => {
-  if (state.ended) return;
-  const world = screenToWorld(e.clientX, e.clientY);
-  if (e.button === 0) {
-    if (placement) {
-      tryPlaceBuilding(world.x, world.y);
-      return;
-    }
-    dragStart = { x: e.clientX, y: e.clientY };
-    dragCurrent = dragStart;
-  } else if (e.button === 2) {
-    handleRightClickCommand(world.x, world.y);
-  }
-});
-window.addEventListener('mousemove', (e) => {
-  mouseWorld = screenToWorld(e.clientX, e.clientY);
-  if (dragStart) dragCurrent = { x: e.clientX, y: e.clientY };
-});
-window.addEventListener('mouseup', (e) => {
-  if (e.button !== 0) return;
-  if (placement) return;
-  if (dragStart) {
-    const dx = Math.abs(dragCurrent.x - dragStart.x);
-    const dy = Math.abs(dragCurrent.y - dragStart.y);
-    const w1 = screenToWorld(dragStart.x, dragStart.y);
-    const w2 = screenToWorld(dragCurrent.x, dragCurrent.y);
-    if (dx > 6 || dy > 6) {
-      handleBoxSelect(w1.x, w1.y, w2.x, w2.y);
-    } else {
-      handleLeftClickSelect(w1.x, w1.y);
-    }
-  }
-  dragStart = null;
-  dragCurrent = null;
-});
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-window.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
-  if (e.key === 'Escape') {
-    placement = null;
-    refreshUI();
-  }
-});
-window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-
-// 觸控：單指點擊＝選取／下令（沒有右鍵，改用「點到自己的單位/建築→選取，否則→下令」規則），
-// 單指拖曳＝框選（跟滑鼠拖曳語意相同），雙指拖曳＝平移視角（手機沒有方向鍵/WASD）。
+// 純觸控操作（不支援滑鼠/鍵盤）：
+// 單指拖曳＝平移視角（最主要的手勢，對應大部分手機帝國遊戲的地圖拖曳操作）
+// 單指輕點＝選取／下令（點到自己的單位/建築→選取，否則→對目前選取的單位下令）
+// 單指按住不放一小段時間後再拖曳＝框選（用來一次選取多個單位）
+// 雙指拖曳＝平移視角（備用手勢，效果與單指拖曳相同）
 function handleTapCommand(wx, wy) {
   const pick = pickEntity(wx, wy);
   if (pick && pick.kind !== 'resource' && pick.ref.owner === human) {
@@ -1824,7 +1809,7 @@ function handleTapCommand(wx, wy) {
   const myUnits = selection.filter((e) => e.kind === 'unit' && e.owner === human);
   const myTrainingBuilding = selection.find((e) => e.kind === 'building' && e.owner === human && e.def.trains);
   if (myUnits.length > 0 || myTrainingBuilding) {
-    handleRightClickCommand(wx, wy);
+    commandAtPoint(wx, wy);
   } else if (pick && pick.kind !== 'resource') {
     selection = [pick.ref];
     refreshUI();
@@ -1835,13 +1820,14 @@ function handleTapCommand(wx, wy) {
 }
 
 const activeTouches = new Map();
-let touchDragStart = null;
-let touchDragCurrent = null;
-let touchStartTime = 0;
-let panMode = false;
+const TAP_MOVE_THRESHOLD = 10;
+const LONG_PRESS_MS = 260;
+
+let gestureMode = 'idle'; // 'idle' | 'pending' | 'pan' | 'boxselect' | 'pan2'
+let gestureStart = null;
+let panLast = null;
 let panMidLast = null;
-const TAP_MOVE_THRESHOLD = 12;
-const TAP_TIME_THRESHOLD = 400;
+let longPressTimer = null;
 
 function touchMidpoint() {
   const pts = [...activeTouches.values()];
@@ -1851,28 +1837,44 @@ function touchMidpoint() {
   return { x, y };
 }
 
+function clearLongPressTimer() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+}
+
+function armLongPressTimer() {
+  clearLongPressTimer();
+  longPressTimer = setTimeout(() => {
+    longPressTimer = null;
+    if (gestureMode === 'pending' && !placement) {
+      gestureMode = 'boxselect';
+      dragStart = { x: gestureStart.x, y: gestureStart.y };
+      dragCurrent = { x: gestureStart.x, y: gestureStart.y };
+    }
+  }, LONG_PRESS_MS);
+}
+
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (state.ended) return;
-  for (const t of e.changedTouches) {
-    activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
-  }
+  for (const t of e.changedTouches) activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+
   if (activeTouches.size >= 2) {
-    panMode = true;
-    touchDragStart = null;
-    touchDragCurrent = null;
+    clearLongPressTimer();
+    gestureMode = 'pan2';
+    dragStart = null;
+    dragCurrent = null;
     panMidLast = touchMidpoint();
-  } else if (activeTouches.size === 1) {
-    panMode = false;
-    const t = [...activeTouches.values()][0];
-    touchDragStart = { x: t.x, y: t.y };
-    touchDragCurrent = touchDragStart;
-    touchStartTime = Date.now();
-    dragStart = touchDragStart;
-    dragCurrent = touchDragCurrent;
-    const world = screenToWorld(t.x, t.y);
-    mouseWorld = world;
+    return;
   }
+
+  const t = [...activeTouches.values()][0];
+  gestureMode = 'pending';
+  gestureStart = { x: t.x, y: t.y };
+  panLast = { x: t.x, y: t.y };
+  dragStart = null;
+  dragCurrent = null;
+  pointerWorld = screenToWorld(t.x, t.y);
+  armLongPressTimer();
 }, { passive: false });
 
 canvas.addEventListener('touchmove', (e) => {
@@ -1880,40 +1882,61 @@ canvas.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) {
     if (activeTouches.has(t.identifier)) activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
   }
-  if (panMode) {
+
+  if (gestureMode === 'pan2') {
     const mid = touchMidpoint();
     if (mid && panMidLast) {
-      camera.x -= (mid.x - panMidLast.x);
-      camera.y -= (mid.y - panMidLast.y);
+      camera.x -= (mid.x - panMidLast.x) / zoom;
+      camera.y -= (mid.y - panMidLast.y) / zoom;
       clampCamera();
     }
     panMidLast = mid;
-  } else if (activeTouches.size === 1 && touchDragStart) {
-    const t = [...activeTouches.values()][0];
-    touchDragCurrent = { x: t.x, y: t.y };
-    dragCurrent = touchDragCurrent;
-    mouseWorld = screenToWorld(t.x, t.y);
+    return;
+  }
+
+  const t = [...activeTouches.values()][0];
+  if (!t) return;
+  pointerWorld = screenToWorld(t.x, t.y);
+
+  if (gestureMode === 'pending') {
+    const dx = t.x - gestureStart.x;
+    const dy = t.y - gestureStart.y;
+    if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD) {
+      clearLongPressTimer();
+      gestureMode = 'pan';
+      camera.x -= dx / zoom;
+      camera.y -= dy / zoom;
+      clampCamera();
+      panLast = { x: t.x, y: t.y };
+    }
+  } else if (gestureMode === 'pan') {
+    camera.x -= (t.x - panLast.x) / zoom;
+    camera.y -= (t.y - panLast.y) / zoom;
+    clampCamera();
+    panLast = { x: t.x, y: t.y };
+  } else if (gestureMode === 'boxselect') {
+    dragCurrent = { x: t.x, y: t.y };
   }
 }, { passive: false });
 
-function endTouchInteraction() {
-  if (!panMode && touchDragStart) {
-    const dx = Math.abs(touchDragCurrent.x - touchDragStart.x);
-    const dy = Math.abs(touchDragCurrent.y - touchDragStart.y);
-    const elapsed = Date.now() - touchStartTime;
-    const w1 = screenToWorld(touchDragStart.x, touchDragStart.y);
-    const w2 = screenToWorld(touchDragCurrent.x, touchDragCurrent.y);
-    const isTap = dx < TAP_MOVE_THRESHOLD && dy < TAP_MOVE_THRESHOLD && elapsed < TAP_TIME_THRESHOLD;
-    if (placement) {
-      if (isTap) tryPlaceBuilding(w1.x, w1.y);
-    } else if (isTap) {
+function finishGesture() {
+  clearLongPressTimer();
+  if (gestureMode === 'pending') {
+    const w = screenToWorld(gestureStart.x, gestureStart.y);
+    if (placement) tryPlaceBuilding(w.x, w.y);
+    else handleTapCommand(w.x, w.y);
+  } else if (gestureMode === 'boxselect') {
+    const dx = Math.abs(dragCurrent.x - dragStart.x);
+    const dy = Math.abs(dragCurrent.y - dragStart.y);
+    const w1 = screenToWorld(dragStart.x, dragStart.y);
+    if (dx < TAP_MOVE_THRESHOLD && dy < TAP_MOVE_THRESHOLD) {
       handleTapCommand(w1.x, w1.y);
     } else {
+      const w2 = screenToWorld(dragCurrent.x, dragCurrent.y);
       handleBoxSelect(w1.x, w1.y, w2.x, w2.y);
     }
   }
-  touchDragStart = null;
-  touchDragCurrent = null;
+  gestureMode = 'idle';
   dragStart = null;
   dragCurrent = null;
 }
@@ -1921,29 +1944,24 @@ function endTouchInteraction() {
 window.addEventListener('touchend', (e) => {
   for (const t of e.changedTouches) activeTouches.delete(t.identifier);
   if (activeTouches.size === 0) {
-    endTouchInteraction();
-    panMode = false;
-    panMidLast = null;
-  } else if (activeTouches.size === 1) {
-    // 兩指平移收回一指：不當作點擊/框選處理，直接重新起算單指拖曳
-    panMode = false;
+    finishGesture();
+  } else if (activeTouches.size === 1 && gestureMode === 'pan2') {
+    // 兩指平移收回一指：直接切回單指平移，不誤判為點擊或框選
+    clearLongPressTimer();
     const t = [...activeTouches.values()][0];
-    touchDragStart = { x: t.x, y: t.y };
-    touchDragCurrent = touchDragStart;
-    touchStartTime = Date.now();
-    dragStart = touchDragStart;
-    dragCurrent = touchDragCurrent;
+    gestureMode = 'pan';
+    panLast = { x: t.x, y: t.y };
+    dragStart = null;
+    dragCurrent = null;
   }
 }, { passive: false });
 window.addEventListener('touchcancel', (e) => {
   for (const t of e.changedTouches) activeTouches.delete(t.identifier);
   if (activeTouches.size === 0) {
-    touchDragStart = null;
-    touchDragCurrent = null;
+    clearLongPressTimer();
+    gestureMode = 'idle';
     dragStart = null;
     dragCurrent = null;
-    panMode = false;
-    panMidLast = null;
   }
 });
 
@@ -1952,9 +1970,8 @@ function tryLockLandscape() {
     if (screen.orientation && screen.orientation.lock) {
       screen.orientation.lock('landscape').catch(() => {});
     }
-  } catch (err) { /* 大多數桌面瀏覽器或非全螢幕環境不支援，忽略即可 */ }
+  } catch (err) { /* 不支援時靜默略過即可 */ }
 }
-document.addEventListener('click', tryLockLandscape, { once: true });
 document.addEventListener('touchend', tryLockLandscape, { once: true });
 
 function tryPlaceBuilding(wx, wy) {
@@ -1969,15 +1986,6 @@ function tryPlaceBuilding(wx, wy) {
   for (const v of builders) issueBuild(state.map, v, b);
   placement = null;
   refreshUI();
-}
-
-function panCamera(dt) {
-  const speed = 480 * dt;
-  if (keys['w'] || keys['arrowup']) camera.y -= speed;
-  if (keys['s'] || keys['arrowdown']) camera.y += speed;
-  if (keys['a'] || keys['arrowleft']) camera.x -= speed;
-  if (keys['d'] || keys['arrowright']) camera.x += speed;
-  clampCamera();
 }
 
 function update(dt) {
@@ -2069,7 +2077,7 @@ function drawShadow(sx, sy, rx, ry) {
 function drawResourceNode(r) {
   const sx = r.x - camera.x;
   const sy = r.y - camera.y;
-  if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
+  if (sx < -30 || sy < -30 || sx > viewW() + 30 || sy > viewH() + 30) return;
   const ratio = Math.max(0.35, r.amount / r.maxAmount);
   ctx.globalAlpha = 0.4 + 0.6 * ratio;
   if (r.type === 'wood') {
@@ -2259,7 +2267,7 @@ function drawBuilding(b) {
   const sx = b.x - camera.x;
   const sy = b.y - camera.y;
   const half = (b.sizeTiles * TILE) / 2;
-  if (sx < -half - 40 || sy < -half - 40 || sx > canvas.width + 40 || sy > canvas.height + 40) return;
+  if (sx < -half - 40 || sy < -half - 40 || sx > viewW() + 40 || sy > viewH() + 40) return;
   const isSel = selection.includes(b);
   const pal = ownerPalette(b.owner);
   drawShadow(sx, sy + half * 0.55, half * 1.05, half * 0.4);
@@ -2325,7 +2333,7 @@ function drawBuilding(b) {
 function drawUnit(u) {
   const sx = u.x - camera.x;
   const sy = u.y - camera.y;
-  if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
+  if (sx < -30 || sy < -30 || sx > viewW() + 30 || sy > viewH() + 30) return;
   const isSel = selection.includes(u);
   const pal = ownerPalette(u.owner);
 
@@ -2406,7 +2414,7 @@ function drawProjectile(p) {
 function drawPlacementGhost() {
   if (!placement) return;
   const def = BUILDINGS[placement.type];
-  const { tx, ty } = state.map.worldToTile(mouseWorld.x, mouseWorld.y);
+  const { tx, ty } = state.map.worldToTile(pointerWorld.x, pointerWorld.y);
   const c = state.map.tileCenter(tx, ty);
   const sx = c.x - camera.x;
   const sy = c.y - camera.y;
@@ -2447,23 +2455,31 @@ function positiveMod(n, m) {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // 世界內容統一用 zoom 縮放繪製，讓手機小螢幕也能看到夠寬廣的地圖範圍；
+  // 觸控框選框則是跟著手指的螢幕座標，不套用縮放（在 restore 之後才畫）。
+  ctx.save();
+  ctx.scale(zoom, zoom);
+
+  const vw = viewW();
+  const vh = viewH();
+
   ctx.save();
   const patSize = TILE * 4;
   ctx.translate(-positiveMod(camera.x, patSize), -positiveMod(camera.y, patSize));
   ctx.fillStyle = groundPattern;
-  ctx.fillRect(0, 0, canvas.width + patSize, canvas.height + patSize);
+  ctx.fillRect(0, 0, vw + patSize, vh + patSize);
   ctx.restore();
 
   ctx.strokeStyle = 'rgba(0,0,0,0.05)';
   const startTx = Math.floor(camera.x / TILE);
   const startTy = Math.floor(camera.y / TILE);
-  for (let tx = startTx; tx < startTx + canvas.width / TILE + 2; tx++) {
+  for (let tx = startTx; tx < startTx + vw / TILE + 2; tx++) {
     const sx = tx * TILE - camera.x;
-    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, vh); ctx.stroke();
   }
-  for (let ty = startTy; ty < startTy + canvas.height / TILE + 2; ty++) {
+  for (let ty = startTy; ty < startTy + vh / TILE + 2; ty++) {
     const sy = ty * TILE - camera.y;
-    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(vw, sy); ctx.stroke();
   }
 
   const drawList = [];
@@ -2477,6 +2493,8 @@ function render() {
 
   for (const pr of state.projectiles) drawProjectile(pr);
   drawPlacementGhost();
+  ctx.restore();
+
   drawSelectionBox();
 }
 
@@ -2697,6 +2715,7 @@ function refreshUI() {
   refreshSelectionInfo();
   refreshActionButtons();
   placementCancelBtn.style.display = placement ? 'block' : 'none';
+  bottompanelEl.classList.toggle('collapsed', selection.length === 0 && !placement);
 }
 
 let lastTs = null;
@@ -2706,7 +2725,6 @@ function frame(ts) {
   lastTs = ts;
   dt = Math.min(dt, 0.05);
   if (!state.ended) {
-    panCamera(dt);
     update(dt);
   }
   render();

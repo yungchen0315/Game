@@ -2,87 +2,195 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#241a10" />
 <title>世紀爭霸</title>
 <style>
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; }
+:root {
+  --wood-dark: #241a10;
+  --wood: #3b2a18;
+  --wood-light: #5a4226;
+  --gold: #e8c14a;
+  --gold-bright: #f3d97a;
+  --parchment: #f3e6c8;
+  --parchment-dim: #cbbf8f;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; overflow: hidden; height: 100%;
+  background: #0d0906;
+  font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
 
-#game { position: fixed; inset: 0; display: block; background: #3a5f2b; cursor: default; }
+#game {
+  position: fixed; inset: 0; display: block;
+  background: #3a5f2b; cursor: default;
+  touch-action: none;
+}
+
+.panel {
+  background: linear-gradient(180deg, var(--wood) 0%, var(--wood-dark) 100%);
+  color: var(--parchment);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -1px 0 rgba(0,0,0,0.4);
+}
 
 #topbar {
-  position: fixed; top: 0; left: 0; right: 0; height: 44px;
-  background: rgba(20, 20, 24, 0.92); color: #f0e6d2;
-  display: flex; align-items: center; gap: 18px; padding: 0 14px;
-  font-size: 15px; z-index: 20; border-bottom: 2px solid #5a4a2a;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: clamp(38px, 7vh, 48px);
+  padding: 0 calc(12px + env(safe-area-inset-left)) 0 calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + env(safe-area-inset-right));
+  padding-top: env(safe-area-inset-top);
+  display: flex; align-items: center; gap: clamp(6px, 1.6vw, 16px);
+  font-size: clamp(12px, 2vh, 15px);
+  z-index: 20; border-bottom: 2px solid var(--gold);
 }
-#topbar .res { display: flex; align-items: center; gap: 4px; min-width: 54px; }
-#topbar .icon { font-size: 16px; }
-#topbar .ageInfo { display: flex; align-items: center; gap: 8px; margin-left: 10px; }
-#topbar .hint { margin-left: auto; font-size: 12px; color: #a9a08a; }
+#topbar .res {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 999px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.08);
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+#topbar .res.wood { box-shadow: inset 2px 0 0 #4a8a3a; }
+#topbar .res.food { box-shadow: inset 2px 0 0 #d99a3a; }
+#topbar .res.gold { box-shadow: inset 2px 0 0 var(--gold); }
+#topbar .res.pop { box-shadow: inset 2px 0 0 #6ea8d8; }
+#topbar .icon { font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6)); }
+#topbar .ageInfo { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-right: 4px; }
+#topbar .ageInfo #ageName { font-weight: bold; color: var(--gold-bright); text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
+#topbar .hint { display: none; }
+@media (min-width: 760px) {
+  #topbar .hint { display: block; margin-left: 14px; font-size: 11px; color: #a9967a; white-space: nowrap; }
+}
 
-.progressbar { width: 90px; height: 8px; background: #333; border-radius: 4px; overflow: hidden; border: 1px solid #555; }
-.progressbar .fill { height: 100%; background: linear-gradient(90deg,#e8c14a,#f3d97a); width: 0%; }
+.progressbar { width: 84px; height: 9px; background: #1a1208; border-radius: 5px; overflow: hidden; border: 1px solid #000; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
+.progressbar .fill { height: 100%; background: linear-gradient(90deg,var(--gold),var(--gold-bright)); width: 0%; box-shadow: 0 0 6px rgba(232,193,74,0.7); }
 .hidden { display: none !important; }
 
-#bottompanel {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 200px;
-  background: rgba(20, 20, 24, 0.92); color: #f0e6d2;
-  display: flex; z-index: 20; border-top: 2px solid #5a4a2a;
+#rotateOverlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: radial-gradient(circle at 50% 40%, #2a1d10, #0d0906 80%);
+  color: var(--parchment);
+  flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 14px; padding: 20px;
+  display: none;
 }
-#selectionInfo { width: 300px; padding: 10px; border-right: 1px solid #4a4030; overflow-y: auto; font-size: 13px; }
-#selectionInfo .placeholder { color: #8a8270; }
-#selectionInfo .name { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
-#selectionInfo .hpbar { width: 100%; height: 8px; background: #400; border-radius: 3px; overflow: hidden; margin: 4px 0; }
-#selectionInfo .hpbar .fill { height: 100%; background: #4caf50; }
-#selectionInfo .stats { display: flex; gap: 10px; font-size: 12px; color: #cfc7ae; flex-wrap: wrap; }
-#selectionInfo .groupItem { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #3a3428; }
+#rotateOverlay .spin { font-size: 54px; animation: rotateHint 1.6s ease-in-out infinite; }
+#rotateOverlay .msg { font-size: 18px; }
+@keyframes rotateHint {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(90deg); }
+}
+@media (orientation: portrait) and (max-width: 900px) {
+  #rotateOverlay { display: flex; }
+  #game, #topbar, #bottompanel { visibility: hidden; }
+}
 
-#actionButtons { flex: 1; padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; overflow-y: auto; }
+#bottompanel {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: clamp(112px, 24vh, 190px);
+  display: flex; z-index: 20; border-top: 2px solid var(--gold);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+#selectionInfo {
+  width: clamp(150px, 26vw, 280px); flex-shrink: 0;
+  padding: 8px 10px; border-right: 1px solid rgba(255,255,255,0.08);
+  overflow-y: auto; font-size: clamp(11px, 1.7vh, 13px);
+}
+#selectionInfo .placeholder { color: #8a7c60; }
+#selectionInfo .name { font-size: 1.2em; font-weight: bold; margin-bottom: 4px; color: var(--gold-bright); }
+#selectionInfo .hpbar { width: 100%; height: 8px; background: #3a0d0d; border-radius: 4px; overflow: hidden; margin: 4px 0; border: 1px solid rgba(0,0,0,0.5); }
+#selectionInfo .hpbar .fill { height: 100%; background: linear-gradient(90deg,#3a8a3f,#6fcb5a); }
+#selectionInfo .stats { display: flex; gap: 8px; font-size: 0.9em; color: var(--parchment-dim); flex-wrap: wrap; }
+#selectionInfo .groupItem { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+
+#actionButtons {
+  flex: 1; padding: 8px; display: flex; flex-wrap: wrap; align-content: flex-start;
+  gap: clamp(5px, 0.9vh, 8px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
 
 .actBtn {
-  width: 108px; height: 68px; background: #2b2620; border: 1px solid #6b5a30; border-radius: 6px;
-  color: #f0e6d2; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 12px; padding: 4px; position: relative; gap: 2px;
+  width: clamp(78px, 13vw, 108px); height: clamp(56px, 11vh, 68px);
+  background: linear-gradient(180deg, #4a3823 0%, #2e2214 100%);
+  border: 1px solid var(--wood-light); border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 4px rgba(0,0,0,0.4);
+  color: var(--parchment);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; font-size: clamp(10px, 1.5vh, 12px); padding: 4px; position: relative; gap: 2px;
+  touch-action: manipulation;
 }
-.actBtn:hover:not(.disabled) { background: #453c2c; border-color: #e8c14a; }
-.actBtn .icon { font-size: 20px; }
-.actBtn .cost { font-size: 10px; color: #cbbf8f; }
-.actBtn.disabled { opacity: 0.45; cursor: not-allowed; }
+.actBtn:active:not(.disabled), .actBtn:hover:not(.disabled) { background: linear-gradient(180deg, #5c4830 0%, #3a2c1a 100%); border-color: var(--gold); box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 0 8px rgba(232,193,74,0.35); }
+.actBtn .icon { font-size: clamp(16px, 3vh, 20px); }
+.actBtn .cost { font-size: 0.85em; color: var(--parchment-dim); }
+.actBtn.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
 .actBtn .queueBadge {
-  position: absolute; top: 2px; right: 4px; background: #e8c14a; color: #222;
-  font-size: 10px; border-radius: 8px; padding: 0 5px;
+  position: absolute; top: -4px; right: -4px; background: var(--gold); color: #241a10;
+  font-size: 10px; font-weight: bold; border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
-.actBtn .miniProgress { position: absolute; bottom: 0; left: 0; height: 4px; background: #7cc36b; }
-.sectionLabel { width: 100%; font-size: 11px; color: #a9a08a; margin: 2px 0 -2px 0; }
+.actBtn .miniProgress { position: absolute; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg,#4a8a3a,#7cc36b); border-radius: 0 0 6px 6px; }
+.sectionLabel { width: 100%; font-size: 11px; color: #a9967a; margin: 2px 0 -2px 0; text-transform: uppercase; letter-spacing: 0.05em; }
+
+#placementCancelBtn {
+  position: fixed; z-index: 25; display: none;
+  top: calc(clamp(38px, 7vh, 48px) + env(safe-area-inset-top) + 10px);
+  left: 50%; transform: translateX(-50%);
+  background: linear-gradient(180deg,#7a2c22,#4a1912); color: var(--parchment);
+  border: 1px solid #c0554a; border-radius: 999px; padding: 8px 18px;
+  font-size: 14px; box-shadow: 0 3px 8px rgba(0,0,0,0.5);
+}
 
 #gameOverOverlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 50;
+  position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 50;
   display: flex; align-items: center; justify-content: center;
 }
-#gameOverBox { background: #201c16; border: 2px solid #e8c14a; border-radius: 10px; padding: 30px 50px; text-align: center; color: #f0e6d2; }
-#gameOverText { font-size: 28px; margin-bottom: 18px; }
-#restartBtn { font-size: 16px; padding: 8px 20px; cursor: pointer; border-radius: 6px; border: 1px solid #e8c14a; background: #3a3222; color: #f0e6d2; }
-#restartBtn:hover { background: #4a4030; }
+#gameOverBox {
+  background: linear-gradient(180deg, var(--wood) 0%, var(--wood-dark) 100%);
+  border: 2px solid var(--gold); border-radius: 12px; padding: clamp(20px,4vh,32px) clamp(28px,6vw,52px);
+  text-align: center; color: var(--parchment); box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+#gameOverText { font-size: clamp(20px, 4vh, 28px); margin-bottom: 18px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+#restartBtn {
+  font-size: 16px; padding: 10px 26px; cursor: pointer; border-radius: 999px;
+  border: 1px solid var(--gold); background: linear-gradient(180deg,#4a3823,#2e2214); color: var(--parchment);
+  touch-action: manipulation;
+}
+#restartBtn:active, #restartBtn:hover { background: linear-gradient(180deg,#5c4830,#3a2c1a); }
 
 </style>
 </head>
 <body>
+  <div id="rotateOverlay">
+    <div class="spin">📱</div>
+    <div class="msg">請將裝置橫向旋轉以進行遊玩</div>
+  </div>
+
   <canvas id="game"></canvas>
 
-  <div id="topbar">
-    <div class="res"><span class="icon">🌲</span><span id="resWood">0</span></div>
-    <div class="res"><span class="icon">🌾</span><span id="resFood">0</span></div>
-    <div class="res"><span class="icon">🪙</span><span id="resGold">0</span></div>
-    <div class="res"><span class="icon">👥</span><span id="resPop">0/0</span></div>
+  <div id="topbar" class="panel">
+    <div class="res wood"><span class="icon">🌲</span><span id="resWood">0</span></div>
+    <div class="res food"><span class="icon">🌾</span><span id="resFood">0</span></div>
+    <div class="res gold"><span class="icon">🪙</span><span id="resGold">0</span></div>
+    <div class="res pop"><span class="icon">👥</span><span id="resPop">0/0</span></div>
     <div class="ageInfo">
       <span id="ageName">黑暗時代</span>
       <div id="ageProgressWrap" class="progressbar hidden"><div id="ageProgressFill" class="fill"></div></div>
     </div>
-    <div class="hint">滑鼠左鍵選取／拖曳框選　右鍵下命令　方向鍵/WASD 移動視角</div>
+    <div class="hint">滑鼠左鍵選取／拖曳框選　右鍵下命令　方向鍵/WASD 移動視角　（觸控：點擊選取/下令、拖曳框選、雙指拖曳平移視角）</div>
   </div>
 
-  <div id="bottompanel">
+  <button id="placementCancelBtn">✕ 取消建造</button>
+
+  <div id="bottompanel" class="panel">
     <div id="selectionInfo"><div class="placeholder">尚未選取任何單位或建築</div></div>
     <div id="actionButtons"></div>
   </div>
@@ -1485,6 +1593,7 @@ const actionButtonsEl = document.getElementById('actionButtons');
 const gameOverOverlay = document.getElementById('gameOverOverlay');
 const gameOverText = document.getElementById('gameOverText');
 const restartBtn = document.getElementById('restartBtn');
+const placementCancelBtn = document.getElementById('placementCancelBtn');
 
 const BUILD_ICON = {
   TownCenter: '🏛️', House: '🏠', Barracks: '⚔️', ArcheryRange: '🏹', Stable: '🐎',
@@ -1494,11 +1603,6 @@ const UNIT_ICON = {
   Villager: '🧑‍🌾', Militia: '🗡️', Swordsman: '🗡️', LongSwordsman: '🗡️',
   Spearman: '🔱', Archer: '🏹', Crossbowman: '🏹', Scout: '🐴', Knight: '🐴',
 };
-const UNIT_LABEL = {
-  Villager: 'V', Militia: 'M', Swordsman: 'S', LongSwordsman: 'L',
-  Spearman: 'Sp', Archer: 'A', Crossbowman: 'C', Scout: 'Sc', Knight: 'K',
-};
-
 let state, human, ai, aiState, camera, selection, placement, uiTimer;
 let dragStart = null;
 let dragCurrent = null;
@@ -1512,8 +1616,10 @@ function costText(cost) {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  if (camera) clampCamera();
 }
 window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
 
 function placeStartingBuilding(player, type, x, y) {
   const b = createBuilding(player, type, x, y, { instant: true });
@@ -1706,6 +1812,151 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
+// 觸控：單指點擊＝選取／下令（沒有右鍵，改用「點到自己的單位/建築→選取，否則→下令」規則），
+// 單指拖曳＝框選（跟滑鼠拖曳語意相同），雙指拖曳＝平移視角（手機沒有方向鍵/WASD）。
+function handleTapCommand(wx, wy) {
+  const pick = pickEntity(wx, wy);
+  if (pick && pick.kind !== 'resource' && pick.ref.owner === human) {
+    selection = [pick.ref];
+    refreshUI();
+    return;
+  }
+  const myUnits = selection.filter((e) => e.kind === 'unit' && e.owner === human);
+  const myTrainingBuilding = selection.find((e) => e.kind === 'building' && e.owner === human && e.def.trains);
+  if (myUnits.length > 0 || myTrainingBuilding) {
+    handleRightClickCommand(wx, wy);
+  } else if (pick && pick.kind !== 'resource') {
+    selection = [pick.ref];
+    refreshUI();
+  } else {
+    selection = [];
+    refreshUI();
+  }
+}
+
+const activeTouches = new Map();
+let touchDragStart = null;
+let touchDragCurrent = null;
+let touchStartTime = 0;
+let panMode = false;
+let panMidLast = null;
+const TAP_MOVE_THRESHOLD = 12;
+const TAP_TIME_THRESHOLD = 400;
+
+function touchMidpoint() {
+  const pts = [...activeTouches.values()];
+  if (pts.length === 0) return null;
+  const x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+  return { x, y };
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (state.ended) return;
+  for (const t of e.changedTouches) {
+    activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+  }
+  if (activeTouches.size >= 2) {
+    panMode = true;
+    touchDragStart = null;
+    touchDragCurrent = null;
+    panMidLast = touchMidpoint();
+  } else if (activeTouches.size === 1) {
+    panMode = false;
+    const t = [...activeTouches.values()][0];
+    touchDragStart = { x: t.x, y: t.y };
+    touchDragCurrent = touchDragStart;
+    touchStartTime = Date.now();
+    dragStart = touchDragStart;
+    dragCurrent = touchDragCurrent;
+    const world = screenToWorld(t.x, t.y);
+    mouseWorld = world;
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (activeTouches.has(t.identifier)) activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
+  }
+  if (panMode) {
+    const mid = touchMidpoint();
+    if (mid && panMidLast) {
+      camera.x -= (mid.x - panMidLast.x);
+      camera.y -= (mid.y - panMidLast.y);
+      clampCamera();
+    }
+    panMidLast = mid;
+  } else if (activeTouches.size === 1 && touchDragStart) {
+    const t = [...activeTouches.values()][0];
+    touchDragCurrent = { x: t.x, y: t.y };
+    dragCurrent = touchDragCurrent;
+    mouseWorld = screenToWorld(t.x, t.y);
+  }
+}, { passive: false });
+
+function endTouchInteraction() {
+  if (!panMode && touchDragStart) {
+    const dx = Math.abs(touchDragCurrent.x - touchDragStart.x);
+    const dy = Math.abs(touchDragCurrent.y - touchDragStart.y);
+    const elapsed = Date.now() - touchStartTime;
+    const w1 = screenToWorld(touchDragStart.x, touchDragStart.y);
+    const w2 = screenToWorld(touchDragCurrent.x, touchDragCurrent.y);
+    const isTap = dx < TAP_MOVE_THRESHOLD && dy < TAP_MOVE_THRESHOLD && elapsed < TAP_TIME_THRESHOLD;
+    if (placement) {
+      if (isTap) tryPlaceBuilding(w1.x, w1.y);
+    } else if (isTap) {
+      handleTapCommand(w1.x, w1.y);
+    } else {
+      handleBoxSelect(w1.x, w1.y, w2.x, w2.y);
+    }
+  }
+  touchDragStart = null;
+  touchDragCurrent = null;
+  dragStart = null;
+  dragCurrent = null;
+}
+
+window.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) activeTouches.delete(t.identifier);
+  if (activeTouches.size === 0) {
+    endTouchInteraction();
+    panMode = false;
+    panMidLast = null;
+  } else if (activeTouches.size === 1) {
+    // 兩指平移收回一指：不當作點擊/框選處理，直接重新起算單指拖曳
+    panMode = false;
+    const t = [...activeTouches.values()][0];
+    touchDragStart = { x: t.x, y: t.y };
+    touchDragCurrent = touchDragStart;
+    touchStartTime = Date.now();
+    dragStart = touchDragStart;
+    dragCurrent = touchDragCurrent;
+  }
+}, { passive: false });
+window.addEventListener('touchcancel', (e) => {
+  for (const t of e.changedTouches) activeTouches.delete(t.identifier);
+  if (activeTouches.size === 0) {
+    touchDragStart = null;
+    touchDragCurrent = null;
+    dragStart = null;
+    dragCurrent = null;
+    panMode = false;
+    panMidLast = null;
+  }
+});
+
+function tryLockLandscape() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('landscape').catch(() => {});
+    }
+  } catch (err) { /* 大多數桌面瀏覽器或非全螢幕環境不支援，忽略即可 */ }
+}
+document.addEventListener('click', tryLockLandscape, { once: true });
+document.addEventListener('touchend', tryLockLandscape, { once: true });
+
 function tryPlaceBuilding(wx, wy) {
   const def = BUILDINGS[placement.type];
   const { tx, ty } = state.map.worldToTile(wx, wy);
@@ -1764,51 +2015,243 @@ function showGameOver() {
   gameOverOverlay.classList.remove('hidden');
 }
 restartBtn.addEventListener('click', () => { initGame(); });
+placementCancelBtn.addEventListener('click', () => { placement = null; refreshUI(); });
+
+// ---- 地形材質：預先畫好一張可平鋪的草地紋理，避免每幀重畫雜訊 ----
+const groundPattern = (() => {
+  const size = TILE * 4;
+  const pc = document.createElement('canvas');
+  pc.width = size; pc.height = size;
+  const pctx = pc.getContext('2d');
+  pctx.fillStyle = '#427238';
+  pctx.fillRect(0, 0, size, size);
+  let seed = 42;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let i = 0; i < 260; i++) {
+    const x = rnd() * size, y = rnd() * size;
+    const shade = rnd();
+    pctx.fillStyle = shade > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)';
+    const w = 2 + rnd() * 4;
+    pctx.beginPath();
+    pctx.ellipse(x, y, w, w * 0.5, rnd() * Math.PI, 0, Math.PI * 2);
+    pctx.fill();
+  }
+  for (let i = 0; i < 40; i++) {
+    const x = rnd() * size, y = rnd() * size;
+    pctx.strokeStyle = 'rgba(30,60,20,0.25)';
+    pctx.lineWidth = 1.5;
+    pctx.beginPath();
+    pctx.moveTo(x, y);
+    pctx.lineTo(x + (rnd() - 0.5) * 6, y - 5 - rnd() * 4);
+    pctx.stroke();
+  }
+  return ctx.createPattern(pc, 'repeat');
+})();
+
+function roundRectPath(x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+function drawShadow(sx, sy, rx, ry) {
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
 
 function drawResourceNode(r) {
   const sx = r.x - camera.x;
   const sy = r.y - camera.y;
   if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
-  const ratio = r.amount / r.maxAmount;
+  const ratio = Math.max(0.35, r.amount / r.maxAmount);
+  ctx.globalAlpha = 0.4 + 0.6 * ratio;
   if (r.type === 'wood') {
-    ctx.fillStyle = `rgba(40,90,45,${0.5 + 0.5 * ratio})`;
+    drawShadow(sx + 2, sy + 12, 13, 5);
+    ctx.fillStyle = '#5a3d1f';
+    ctx.fillRect(sx - 3, sy + 2, 6, 10);
+    const foliage = [
+      { dx: 0, dy: -18, rr: 13, c: '#254a1f' },
+      { dx: -8, dy: -8, rr: 11, c: '#2f5c27' },
+      { dx: 8, dy: -8, rr: 11, c: '#2f5c27' },
+      { dx: 0, dy: -12, rr: 12, c: '#3f7a34' },
+    ];
+    for (const f of foliage) {
+      ctx.fillStyle = f.c;
+      ctx.beginPath();
+      ctx.arc(sx + f.dx, sy + f.dy, f.rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
     ctx.beginPath();
-    ctx.moveTo(sx, sy - 14);
-    ctx.lineTo(sx - 11, sy + 9);
-    ctx.lineTo(sx + 11, sy + 9);
-    ctx.closePath();
+    ctx.arc(sx - 4, sy - 18, 4, 0, Math.PI * 2);
     ctx.fill();
   } else if (r.type === 'gold') {
-    ctx.fillStyle = `rgba(212,175,55,${0.5 + 0.5 * ratio})`;
+    drawShadow(sx, sy + 8, 13, 5);
+    const facets = [
+      { dx: 0, dy: -6, s: 10, c: '#8a6f1f' },
+      { dx: -7, dy: 2, s: 8, c: '#a8862a' },
+      { dx: 7, dy: 3, s: 8, c: '#9a7a22' },
+    ];
+    for (const f of facets) {
+      ctx.fillStyle = f.c;
+      ctx.beginPath();
+      ctx.moveTo(sx + f.dx, sy + f.dy - f.s * 0.6);
+      ctx.lineTo(sx + f.dx + f.s * 0.6, sy + f.dy);
+      ctx.lineTo(sx + f.dx, sy + f.dy + f.s * 0.6);
+      ctx.lineTo(sx + f.dx - f.s * 0.6, sy + f.dy);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = '#e8c14a';
     ctx.beginPath();
-    ctx.moveTo(sx, sy - 10);
-    ctx.lineTo(sx + 10, sy);
-    ctx.lineTo(sx, sy + 10);
-    ctx.lineTo(sx - 10, sy);
+    ctx.moveTo(sx, sy - 11);
+    ctx.lineTo(sx + 8, sy - 1);
+    ctx.lineTo(sx, sy + 7);
+    ctx.lineTo(sx - 8, sy - 1);
     ctx.closePath();
     ctx.fill();
-  } else {
-    ctx.fillStyle = `rgba(180,50,60,${0.5 + 0.5 * ratio})`;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.beginPath();
-    ctx.arc(sx, sy, 9, 0, Math.PI * 2);
+    ctx.arc(sx - 2, sy - 4, 2, 0, Math.PI * 2);
     ctx.fill();
+  } else {
+    drawShadow(sx, sy + 8, 12, 5);
+    ctx.fillStyle = '#2f5c27';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3f7a34';
+    ctx.beginPath();
+    ctx.arc(sx - 4, sy - 3, 7, 0, Math.PI * 2);
+    ctx.fill();
+    const berries = [[-4, -2], [3, -4], [1, 3], [-2, 4], [5, 1]];
+    for (const [bx, by] of berries) {
+      ctx.fillStyle = '#c0392b';
+      ctx.beginPath();
+      ctx.arc(sx + bx, sy + by, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
+  ctx.globalAlpha = 1;
+}
+
+function ownerPalette(owner) {
+  return owner.id === 0
+    ? { light: '#5b9bf5', mid: '#3b82f6', dark: '#1d4ed8', darkest: '#123a8a' }
+    : { light: '#f5726b', mid: '#ef4444', dark: '#b91c1c', darkest: '#7a1010' };
 }
 
 function ownerColor(owner, alt) {
-  if (owner.id === 0) return alt ? '#1d4ed8' : '#3b82f6';
-  return alt ? '#b91c1c' : '#ef4444';
+  const p = ownerPalette(owner);
+  return alt ? p.dark : p.mid;
 }
 
 function drawHpBar(sx, sy, width, ratio, selected) {
-  ctx.fillStyle = '#200';
-  ctx.fillRect(sx - width / 2, sy, width, 5);
-  ctx.fillStyle = ratio > 0.5 ? '#4caf50' : ratio > 0.25 ? '#e6b800' : '#e53935';
-  ctx.fillRect(sx - width / 2, sy, width * Math.max(0, ratio), 5);
+  const h = 6;
+  roundRectPath(sx - width / 2 - 1, sy - 1, width + 2, h + 2, 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fill();
+  const barColor = ratio > 0.5 ? '#5fbf4f' : ratio > 0.25 ? '#e6b800' : '#e53935';
+  roundRectPath(sx - width / 2, sy, Math.max(2, width * Math.max(0, ratio)), h, 2.5);
+  ctx.fillStyle = barColor;
+  ctx.fill();
   if (selected) {
-    ctx.strokeStyle = '#fff';
+    roundRectPath(sx - width / 2 - 1, sy - 1, width + 2, h + 2, 3);
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(sx - width / 2, sy, width, 5);
+    ctx.stroke();
+  }
+}
+
+const BUILDING_ROOF_COLOR = { light: '#c94f3f', dark: '#8a3226' };
+
+function drawBuildingDetail(b, sx, sy, half, pal) {
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 1;
+  switch (b.type) {
+    case 'TownCenter': {
+      const t = half * 0.32;
+      for (const [cx, cy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        ctx.fillStyle = pal.darkest;
+        ctx.fillRect(sx + cx * half - t / 2, sy + cy * half - t / 2, t, t);
+      }
+      ctx.fillStyle = BUILDING_ROOF_COLOR.light;
+      ctx.beginPath();
+      ctx.moveTo(sx - half * 0.75, sy - half * 0.15);
+      ctx.lineTo(sx, sy - half * 1.05);
+      ctx.lineTo(sx + half * 0.75, sy - half * 0.15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.stroke();
+      ctx.strokeStyle = pal.light;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - half * 1.05);
+      ctx.lineTo(sx, sy - half * 1.4);
+      ctx.stroke();
+      ctx.fillStyle = BUILDING_ROOF_COLOR.light;
+      ctx.fillRect(sx, sy - half * 1.4, half * 0.35, half * 0.2);
+      break;
+    }
+    case 'House': {
+      ctx.fillStyle = BUILDING_ROOF_COLOR.dark;
+      ctx.beginPath();
+      ctx.moveTo(sx - half * 0.85, sy - half * 0.1);
+      ctx.lineTo(sx, sy - half);
+      ctx.lineTo(sx + half * 0.85, sy - half * 0.1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'Farm': {
+      ctx.fillStyle = '#8a6a3a';
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillRect(sx - half * 0.85, sy + i * (half * 0.32), half * 1.7, half * 0.14);
+      }
+      break;
+    }
+    case 'LumberCamp': {
+      ctx.fillStyle = '#6b4a2a';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.ellipse(sx - half * 0.4 + i * 8, sy + half * 0.35, 10, 4, 0.15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case 'MiningCamp': {
+      ctx.fillStyle = '#7a7a80';
+      ctx.beginPath();
+      ctx.moveTo(sx - half * 0.5, sy + half * 0.5);
+      ctx.lineTo(sx, sy - half * 0.1);
+      ctx.lineTo(sx + half * 0.5, sy + half * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'Blacksmith': {
+      ctx.fillStyle = '#4a4a4a';
+      ctx.fillRect(sx + half * 0.3, sy - half * 1.3, half * 0.28, half * 0.9);
+      if (Math.sin(state.time * 3 + b.id) > 0) {
+        ctx.fillStyle = 'rgba(200,200,200,0.4)';
+        ctx.beginPath();
+        ctx.arc(sx + half * 0.44, sy - half * 1.4, half * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    default: {
+      ctx.fillStyle = BUILDING_ROOF_COLOR.dark;
+      ctx.fillRect(sx - half * 0.8, sy - half * 0.15, half * 1.6, half * 0.15);
+    }
   }
 }
 
@@ -1818,32 +2261,64 @@ function drawBuilding(b) {
   const half = (b.sizeTiles * TILE) / 2;
   if (sx < -half - 40 || sy < -half - 40 || sx > canvas.width + 40 || sy > canvas.height + 40) return;
   const isSel = selection.includes(b);
-  ctx.globalAlpha = b.constructing ? 0.55 : 1;
-  ctx.fillStyle = ownerColor(b.owner, true);
-  ctx.strokeStyle = isSel ? '#ffe066' : '#1a1a1a';
+  const pal = ownerPalette(b.owner);
+  drawShadow(sx, sy + half * 0.55, half * 1.05, half * 0.4);
+
+  ctx.globalAlpha = b.constructing ? 0.6 : 1;
+  const grad = ctx.createLinearGradient(sx, sy - half, sx, sy + half);
+  grad.addColorStop(0, pal.light);
+  grad.addColorStop(1, pal.dark);
+  ctx.fillStyle = grad;
+  roundRectPath(sx - half, sy - half, half * 2, half * 2, 4);
+  ctx.fill();
+  ctx.strokeStyle = isSel ? '#ffe066' : pal.darkest;
   ctx.lineWidth = isSel ? 3 : 2;
-  ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
-  ctx.strokeRect(sx - half, sy - half, half * 2, half * 2);
+  ctx.stroke();
+
+  if (!b.constructing) drawBuildingDetail(b, sx, sy, half, pal);
+
+  if (b.constructing) {
+    ctx.save();
+    roundRectPath(sx - half, sy - half, half * 2, half * 2, 4);
+    ctx.clip();
+    ctx.strokeStyle = 'rgba(255,230,150,0.4)';
+    ctx.lineWidth = 3;
+    for (let i = -4; i <= 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(sx - half + i * (half / 2), sy - half);
+      ctx.lineTo(sx - half + i * (half / 2) + half * 2, sy + half);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   ctx.globalAlpha = 1;
+
   ctx.font = `${Math.min(22, half)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 3;
   ctx.fillStyle = '#fff';
-  ctx.fillText(BUILD_ICON[b.type] || '?', sx, sy);
-  drawHpBar(sx, sy - half - 10, half * 1.6, b.hp / b.maxHp, isSel);
+  ctx.fillText(BUILD_ICON[b.type] || '?', sx, sy + half * 0.15);
+  ctx.shadowBlur = 0;
+
+  drawHpBar(sx, sy - half - 11, half * 1.6, b.hp / b.maxHp, isSel);
   if (b.constructing) {
     ctx.fillStyle = '#ffe066';
-    ctx.font = '11px sans-serif';
-    ctx.fillText('建造中', sx, sy + half + 10);
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('建造中', sx, sy + half + 12);
   }
   if (b.research) {
     const ratio = 1 - b.research.timeLeft / b.research.total;
-    ctx.fillStyle = '#7cc7ff';
-    ctx.fillRect(sx - half, sy + half + 4, half * 2 * ratio, 4);
+    roundRectPath(sx - half, sy + half + 4, half * 2, 4, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fill();
+    roundRectPath(sx - half, sy + half + 4, half * 2 * ratio, 4, 2);
+    ctx.fillStyle = '#7cc7ff'; ctx.fill();
   }
   if (b.flashTimer > 0) {
+    roundRectPath(sx - half, sy - half, half * 2, half * 2, 4);
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+    ctx.fill();
   }
 }
 
@@ -1852,38 +2327,80 @@ function drawUnit(u) {
   const sy = u.y - camera.y;
   if (sx < -30 || sy < -30 || sx > canvas.width + 30 || sy > canvas.height + 30) return;
   const isSel = selection.includes(u);
+  const pal = ownerPalette(u.owner);
+
+  drawShadow(sx, sy + u.radius * 0.65, u.radius * 0.9, u.radius * 0.4);
+
+  if (isSel) {
+    const pulse = 2.5 + Math.sin(state.time * 5) * 1.2;
+    ctx.strokeStyle = 'rgba(255,224,102,0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + u.radius * 0.6, u.radius + pulse, (u.radius + pulse) * 0.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (u.stats.class !== 'villager' && u.path && u.path.length > 0) {
+    const fx = sx + Math.cos(u.facing) * (u.radius + 5);
+    const fy = sy + Math.sin(u.facing) * (u.radius + 5);
+    ctx.fillStyle = pal.darkest;
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx - Math.cos(u.facing - 0.5) * 5, fy - Math.sin(u.facing - 0.5) * 5);
+    ctx.lineTo(fx - Math.cos(u.facing + 0.5) * 5, fy - Math.sin(u.facing + 0.5) * 5);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const grad = ctx.createRadialGradient(sx - u.radius * 0.3, sy - u.radius * 0.3, 1, sx, sy, u.radius);
+  grad.addColorStop(0, pal.light);
+  grad.addColorStop(1, pal.dark);
   ctx.beginPath();
   ctx.arc(sx, sy, u.radius, 0, Math.PI * 2);
-  ctx.fillStyle = ownerColor(u.owner);
+  ctx.fillStyle = grad;
   ctx.fill();
-  ctx.strokeStyle = isSel ? '#ffe066' : '#111';
-  ctx.lineWidth = isSel ? 3 : 1.5;
+  ctx.strokeStyle = isSel ? '#ffe066' : pal.darkest;
+  ctx.lineWidth = isSel ? 2.5 : 1.5;
   ctx.stroke();
   if (u.flashTimer > 0) {
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.fill();
   }
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 10px sans-serif';
+  ctx.font = `${Math.round(u.radius * 1.15)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(UNIT_LABEL[u.type] || '?', sx, sy + 1);
-  if (u.hp < u.maxHp || isSel) drawHpBar(sx, sy - u.radius - 9, u.radius * 2.2, u.hp / u.maxHp, isSel);
+  ctx.fillText(UNIT_ICON[u.type] || '?', sx, sy + 1);
+  if (u.hp < u.maxHp || isSel) drawHpBar(sx, sy - u.radius - 10, u.radius * 2.2, u.hp / u.maxHp, isSel);
   if (u.carry.amount > 0) {
-    ctx.fillStyle = u.carry.type === 'wood' ? '#3a6b30' : u.carry.type === 'gold' ? '#d4af37' : '#c0392b';
-    ctx.beginPath();
-    ctx.arc(sx + u.radius * 0.7, sy - u.radius * 0.7, 4, 0, Math.PI * 2);
-    ctx.fill();
+    const cx = sx + u.radius * 0.7, cy = sy - u.radius * 0.7;
+    ctx.fillStyle = '#1a1410';
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = u.carry.type === 'wood' ? '#4a8a3a' : u.carry.type === 'gold' ? '#e8c14a' : '#d9843a';
+    ctx.beginPath(); ctx.arc(cx, cy, 4.5, 0, Math.PI * 2); ctx.fill();
   }
 }
 
 function drawProjectile(p) {
   const sx = p.x - camera.x;
   const sy = p.y - camera.y;
-  ctx.fillStyle = '#3a2a10';
+  const ang = Math.atan2(p.target.y - p.y, p.target.x - p.x);
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(ang);
+  ctx.strokeStyle = '#3a2a10';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+  ctx.moveTo(-9, 0);
+  ctx.lineTo(4, 0);
+  ctx.stroke();
+  ctx.fillStyle = '#2a1c08';
+  ctx.beginPath();
+  ctx.moveTo(7, 0);
+  ctx.lineTo(2, -2.5);
+  ctx.lineTo(2, 2.5);
+  ctx.closePath();
   ctx.fill();
+  ctx.restore();
 }
 
 function drawPlacementGhost() {
@@ -1895,10 +2412,19 @@ function drawPlacementGhost() {
   const sy = c.y - camera.y;
   const half = (def.size * TILE) / 2;
   const valid = state.map.canPlaceFootprint(c.x, c.y, def.size) && human.canAfford(def.cost);
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = 0.55;
+  roundRectPath(sx - half, sy - half, half * 2, half * 2, 4);
   ctx.fillStyle = valid ? '#4caf50' : '#e53935';
-  ctx.fillRect(sx - half, sy - half, half * 2, half * 2);
+  ctx.fill();
+  ctx.strokeStyle = valid ? '#bff5b0' : '#ffb3ad';
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.globalAlpha = 1;
+  ctx.font = `${Math.min(22, half)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(BUILD_ICON[placement.type] || '?', sx, sy);
 }
 
 function drawSelectionBox() {
@@ -1906,19 +2432,29 @@ function drawSelectionBox() {
   const dx = Math.abs(dragCurrent.x - dragStart.x);
   const dy = Math.abs(dragCurrent.y - dragStart.y);
   if (dx < 6 && dy < 6) return;
-  ctx.strokeStyle = '#ffe066';
-  ctx.lineWidth = 1.5;
   const x = Math.min(dragStart.x, dragCurrent.x);
   const y = Math.min(dragStart.y, dragCurrent.y);
+  ctx.fillStyle = 'rgba(255,224,102,0.12)';
+  ctx.fillRect(x, y, dx, dy);
+  ctx.strokeStyle = '#ffe066';
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(x, y, dx, dy);
+}
+
+function positiveMod(n, m) {
+  return ((n % m) + m) % m;
 }
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#3a5f2b';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  const patSize = TILE * 4;
+  ctx.translate(-positiveMod(camera.x, patSize), -positiveMod(camera.y, patSize));
+  ctx.fillStyle = groundPattern;
+  ctx.fillRect(0, 0, canvas.width + patSize, canvas.height + patSize);
+  ctx.restore();
 
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.05)';
   const startTx = Math.floor(camera.x / TILE);
   const startTy = Math.floor(camera.y / TILE);
   for (let tx = startTx; tx < startTx + canvas.width / TILE + 2; tx++) {
@@ -1930,9 +2466,15 @@ function render() {
     ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.width, sy); ctx.stroke();
   }
 
-  for (const r of state.map.resources) drawResourceNode(r);
-  for (const p of state.players) for (const b of p.buildings) drawBuilding(b);
-  for (const p of state.players) for (const u of p.units) drawUnit(u);
+  const drawList = [];
+  for (const r of state.map.resources) drawList.push({ y: r.y, draw: () => drawResourceNode(r) });
+  for (const p of state.players) {
+    for (const b of p.buildings) drawList.push({ y: b.y + (b.sizeTiles * TILE) / 2, draw: () => drawBuilding(b) });
+    for (const u of p.units) drawList.push({ y: u.y, draw: () => drawUnit(u) });
+  }
+  drawList.sort((a, b) => a.y - b.y);
+  for (const item of drawList) item.draw();
+
   for (const pr of state.projectiles) drawProjectile(pr);
   drawPlacementGhost();
   drawSelectionBox();
@@ -1958,6 +2500,7 @@ function buildBuildingButtons(container) {
     btn.onclick = () => {
       if (!human.canAfford(def.cost)) return;
       placement = { type };
+      placementCancelBtn.style.display = 'block';
     };
     container.appendChild(btn);
   }
@@ -2153,6 +2696,7 @@ function refreshUI() {
   refreshTopbar();
   refreshSelectionInfo();
   refreshActionButtons();
+  placementCancelBtn.style.display = placement ? 'block' : 'none';
 }
 
 let lastTs = null;

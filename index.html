@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>世紀爭霸</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="topbar">
+    <div class="res"><span class="icon">🌲</span><span id="resWood">0</span></div>
+    <div class="res"><span class="icon">🌾</span><span id="resFood">0</span></div>
+    <div class="res"><span class="icon">🪙</span><span id="resGold">0</span></div>
+    <div class="res"><span class="icon">👥</span><span id="resPop">0/0</span></div>
+    <div class="ageInfo">
+      <span id="ageName">黑暗時代</span>
+      <div id="ageProgressWrap" class="progressbar hidden"><div id="ageProgressFill" class="fill"></div></div>
+    </div>
+    <div class="hint">滑鼠左鍵選取／拖曳框選　右鍵下命令　方向鍵/WASD 移動視角</div>
+  </div>
+
+  <div id="bottompanel">
+    <div id="selectionInfo"><div class="placeholder">尚未選取任何單位或建築</div></div>
+    <div id="actionButtons"></div>
+  </div>
+
+  <div id="gameOverOverlay" class="hidden">
+    <div id="gameOverBox">
+      <div id="gameOverText"></div>
+      <button id="restartBtn">重新開始</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>

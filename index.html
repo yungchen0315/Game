@@ -63,9 +63,27 @@ html, body {
 #topbar .res.food { box-shadow: inset 2px 0 0 #d99a3a; }
 #topbar .res.gold { box-shadow: inset 2px 0 0 var(--gold); }
 #topbar .res.pop { box-shadow: inset 2px 0 0 #6ea8d8; }
+#topbar .res.relic { box-shadow: inset 2px 0 0 #b06ee0; }
 #topbar .icon { font-size: 1.1em; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.6)); }
 #topbar .ageInfo { display: flex; align-items: center; gap: 8px; margin-left: auto; padding-right: 4px; }
 #topbar .ageInfo #ageName { font-weight: bold; color: var(--gold-bright); text-shadow: 0 1px 2px rgba(0,0,0,0.6); white-space: nowrap; }
+#wonderInfo {
+  position: fixed; z-index: 20; left: 50%; transform: translateX(-50%);
+  top: calc(clamp(38px, 7vh, 48px) + env(safe-area-inset-top) + 6px);
+  background: linear-gradient(180deg,#5a3a10,#2e1c08); border: 1px solid var(--gold);
+  border-radius: 999px; padding: 4px 16px; font-size: 12px; color: var(--gold-bright);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.5); white-space: nowrap;
+}
+
+#minimap {
+  position: fixed; z-index: 21;
+  top: calc(clamp(38px, 7vh, 48px) + env(safe-area-inset-top) + 8px);
+  right: calc(8px + env(safe-area-inset-right));
+  width: clamp(90px, 16vw, 140px); height: clamp(70px, 13vw, 110px);
+  border: 2px solid var(--gold); border-radius: 6px;
+  background: #0d1a08; opacity: 0.92; touch-action: none;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+}
 
 .progressbar { width: 84px; height: 9px; background: #1a1208; border-radius: 5px; overflow: hidden; border: 1px solid #000; box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); }
 .progressbar .fill { height: 100%; background: linear-gradient(90deg,var(--gold),var(--gold-bright)); width: 0%; box-shadow: 0 0 6px rgba(232,193,74,0.7); }
@@ -144,6 +162,7 @@ html, body {
   font-size: 10px; font-weight: bold; border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 .actBtn .miniProgress { position: absolute; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg,#4a8a3a,#7cc36b); border-radius: 0 0 6px 6px; }
+.actBtn.selectedStance { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), 0 0 8px rgba(232,193,74,0.4); }
 .sectionLabel { width: 100%; font-size: 11px; color: #a9967a; margin: 2px 0 -2px 0; text-transform: uppercase; letter-spacing: 0.05em; }
 
 #placementCancelBtn {
@@ -164,7 +183,8 @@ html, body {
   border: 2px solid var(--gold); border-radius: 12px; padding: clamp(20px,4vh,32px) clamp(28px,6vw,52px);
   text-align: center; color: var(--parchment); box-shadow: 0 10px 40px rgba(0,0,0,0.6);
 }
-#gameOverText { font-size: clamp(20px, 4vh, 28px); margin-bottom: 18px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+#gameOverText { font-size: clamp(20px, 4vh, 28px); margin-bottom: 12px; text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+#gameOverStats { font-size: 13px; color: var(--parchment-dim); margin-bottom: 18px; line-height: 1.7; }
 #restartBtn {
   font-size: 16px; padding: 10px 26px; cursor: pointer; border-radius: 999px;
   border: 1px solid var(--gold); background: linear-gradient(180deg,#4a3823,#2e2214); color: var(--parchment);
@@ -172,6 +192,42 @@ html, body {
 }
 #restartBtn:active, #restartBtn:hover { background: linear-gradient(180deg,#5c4830,#3a2c1a); }
 
+#setupOverlay {
+  position: fixed; inset: 0; z-index: 60; overflow-y: auto;
+  background: radial-gradient(circle at 50% 20%, #3b2a18, #0d0906 85%);
+  color: var(--parchment);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: clamp(10px, 3vh, 24px) 12px;
+}
+#setupBox { width: min(720px, 100%); text-align: center; }
+#setupBox h1 {
+  font-size: clamp(22px, 4vh, 32px); color: var(--gold-bright); margin: 4px 0 clamp(10px, 2vh, 20px);
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+.setupSection { margin-bottom: clamp(10px, 2vh, 18px); text-align: left; }
+.setupLabel {
+  font-size: 13px; color: #a9967a; text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 6px; padding-left: 2px;
+}
+.setupGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.setupOption {
+  background: linear-gradient(180deg, #4a3823 0%, #2e2214 100%);
+  border: 1px solid var(--wood-light); border-radius: 8px; padding: 10px 12px;
+  cursor: pointer; touch-action: manipulation;
+}
+.setupOption:active { background: linear-gradient(180deg, #5c4830 0%, #3a2c1a 100%); }
+.setupOption.selected {
+  border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), 0 0 10px rgba(232,193,74,0.35);
+  background: linear-gradient(180deg, #5c4830 0%, #3a2c1a 100%);
+}
+.setupOptTitle { font-weight: bold; color: var(--gold-bright); font-size: 14px; }
+.setupOptDesc { font-size: 11.5px; color: var(--parchment-dim); margin-top: 3px; line-height: 1.4; }
+#startGameBtn {
+  font-size: 17px; padding: 12px 40px; cursor: pointer; border-radius: 999px; margin-top: 8px;
+  border: 1px solid var(--gold); background: linear-gradient(180deg,#6b8a3a,#3a5322); color: var(--parchment);
+  touch-action: manipulation; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+#startGameBtn:active { background: linear-gradient(180deg,#7c9c48,#456530); }
 </style>
 </head>
 <body>
@@ -181,16 +237,19 @@ html, body {
   </div>
 
   <canvas id="game"></canvas>
+  <canvas id="minimap"></canvas>
 
   <div id="topbar" class="panel">
     <div class="res wood"><span class="icon">🌲</span><span id="resWood">0</span></div>
     <div class="res food"><span class="icon">🌾</span><span id="resFood">0</span></div>
     <div class="res gold"><span class="icon">🪙</span><span id="resGold">0</span></div>
+    <div class="res relic"><span class="icon">💎</span><span id="resRelic">0</span></div>
     <div class="res pop"><span class="icon">👥</span><span id="resPop">0/0</span></div>
     <div class="ageInfo">
       <span id="ageName">黑暗時代</span>
       <div id="ageProgressWrap" class="progressbar hidden"><div id="ageProgressFill" class="fill"></div></div>
     </div>
+    <div id="wonderInfo" class="hidden"></div>
   </div>
 
   <button id="placementCancelBtn">✕ 取消建造</button>
@@ -200,21 +259,40 @@ html, body {
     <div id="actionButtons"></div>
   </div>
 
+  <div id="setupOverlay">
+    <div id="setupBox">
+      <h1>世紀爭霸</h1>
+      <div class="setupSection">
+        <div class="setupLabel">選擇你的文明</div>
+        <div id="civGrid" class="setupGrid"></div>
+      </div>
+      <div class="setupSection">
+        <div class="setupLabel">電腦對手人數</div>
+        <div id="opponentGrid" class="setupGrid"></div>
+      </div>
+      <div class="setupSection">
+        <div class="setupLabel">難度</div>
+        <div id="difficultyGrid" class="setupGrid"></div>
+      </div>
+      <button id="startGameBtn">開始遊戲</button>
+    </div>
+  </div>
+
   <div id="gameOverOverlay" class="hidden">
     <div id="gameOverBox">
       <div id="gameOverText"></div>
+      <div id="gameOverStats"></div>
       <button id="restartBtn">重新開始</button>
     </div>
   </div>
 
   <script>
-
 // ===== data.js =====
-// 遊戲數值資料：建築、單位、年代、科技
+// 遊戲數值資料：建築、單位、年代、科技、難度、市場、聖物、奇觀等常數設定
 
 const TILE = 32;
-const MAP_W = 50; // 格數
-const MAP_H = 38;
+const MAP_W = 62; // 格數（比之前更大，容納更多玩家與更豐富的地景）
+const MAP_H = 46;
 
 const AGES = [
   { id: 0, name: '黑暗時代', nextCost: null },
@@ -223,14 +301,21 @@ const AGES = [
     name: '封建時代',
     nextCost: { food: 400, wood: 200 },
     researchTime: 25,
-    unlocks: ['ArcheryRange', 'Stable', 'Blacksmith', 'LumberCamp', 'MiningCamp'],
+    unlocks: ['ArcheryRange', 'Stable', 'Blacksmith', 'LumberCamp', 'MiningCamp', 'Market', 'WatchTower', 'Gate'],
   },
   {
     id: 2,
     name: '城堡時代',
     nextCost: { food: 700, gold: 400 },
     researchTime: 35,
-    unlocks: [],
+    unlocks: ['University', 'Monastery', 'SiegeWorkshop'],
+  },
+  {
+    id: 3,
+    name: '帝王時代',
+    nextCost: { food: 1000, gold: 700 },
+    researchTime: 45,
+    unlocks: ['Wonder'],
   },
 ];
 
@@ -326,6 +411,92 @@ const BUILDINGS = {
     requiresAge: 1,
     sight: 4,
   },
+  Market: {
+    name: '市場',
+    hp: 400,
+    size: 3,
+    cost: { wood: 175 },
+    buildTime: 22,
+    requiresAge: 1,
+    hasTrade: true,
+    sight: 4,
+  },
+  University: {
+    name: '大學',
+    hp: 500,
+    size: 3,
+    cost: { wood: 200, gold: 100 },
+    buildTime: 26,
+    researches: ['Ballistics', 'Masonry', 'SiegeEngineers', 'TreadmillCrane'],
+    requiresAge: 2,
+    sight: 4,
+  },
+  Monastery: {
+    name: '修道院',
+    hp: 500,
+    size: 3,
+    cost: { wood: 175, gold: 100 },
+    buildTime: 24,
+    trains: ['Monk'],
+    researches: ['HerbalMedicine', 'Sanctity'],
+    requiresAge: 2,
+    sight: 5,
+    relicDropOff: true,
+  },
+  SiegeWorkshop: {
+    name: '攻城作坊',
+    hp: 600,
+    size: 3,
+    cost: { wood: 200 },
+    buildTime: 28,
+    trains: ['BatteringRam', 'Mangonel'],
+    requiresAge: 2,
+    sight: 4,
+  },
+  Wonder: {
+    name: '奇觀',
+    hp: 4000,
+    size: 4,
+    cost: { wood: 1000, gold: 1000, food: 500 },
+    buildTime: 60,
+    requiresAge: 3,
+    isWonder: true,
+    sight: 8,
+  },
+  Wall: {
+    name: '城牆',
+    hp: 200,
+    size: 1,
+    cost: { wood: 5, gold: 3 },
+    buildTime: 4,
+    requiresAge: 0,
+    sight: 1,
+    isWall: true,
+  },
+  Gate: {
+    name: '城門',
+    hp: 250,
+    size: 1,
+    cost: { wood: 30, gold: 15 },
+    buildTime: 8,
+    requiresAge: 1,
+    sight: 2,
+    isGate: true,
+  },
+  WatchTower: {
+    name: '箭塔',
+    hp: 500,
+    size: 2,
+    cost: { wood: 150, gold: 50 },
+    buildTime: 22,
+    requiresAge: 1,
+    sight: 6,
+    attack: 5,
+    range: 5 * TILE,
+    attackInterval: 1.6,
+    projectileSpeed: 340,
+    isDefense: true,
+  },
 };
 
 // 單位定義。attack/armor/hp 為基礎值，會被科技加成修改（存於 player.techBonus）
@@ -383,6 +554,19 @@ const UNITS = {
     trainTime: 18,
     class: 'infantry',
     radius: 10,
+    upgradeTo: 'Champion',
+  },
+  Champion: {
+    name: '冠軍兵',
+    hp: 85,
+    attack: 15,
+    armor: 4,
+    range: 0,
+    speed: 48,
+    cost: { food: 85, gold: 40 },
+    trainTime: 20,
+    class: 'infantry',
+    radius: 10,
   },
   Spearman: {
     name: '長槍兵',
@@ -396,6 +580,20 @@ const UNITS = {
     requiresAge: 1,
     class: 'infantry',
     bonusVs: { cavalry: 18 },
+    radius: 10,
+    upgradeTo: 'Halberdier',
+  },
+  Halberdier: {
+    name: '長戟兵',
+    hp: 55,
+    attack: 5,
+    armor: 1,
+    range: 0,
+    speed: 47,
+    cost: { food: 100, wood: 50 },
+    trainTime: 18,
+    class: 'infantry',
+    bonusVs: { cavalry: 26, siege: 10 },
     radius: 10,
   },
   Archer: {
@@ -425,6 +623,20 @@ const UNITS = {
     class: 'archer',
     radius: 9,
     projectileSpeed: 360,
+    upgradeTo: 'Arbalest',
+  },
+  Arbalest: {
+    name: '強弩手',
+    hp: 40,
+    attack: 8,
+    armor: 0,
+    range: 5 * TILE,
+    speed: 46,
+    cost: { wood: 30, gold: 50 },
+    trainTime: 18,
+    class: 'archer',
+    radius: 9,
+    projectileSpeed: 400,
   },
   Scout: {
     name: '偵察騎兵',
@@ -451,23 +663,114 @@ const UNITS = {
     trainTime: 22,
     class: 'cavalry',
     radius: 11,
+    upgradeTo: 'Paladin',
+  },
+  Paladin: {
+    name: '聖騎士',
+    hp: 130,
+    attack: 13,
+    armor: 3,
+    range: 0,
+    speed: 88,
+    cost: { food: 100, gold: 40 },
+    trainTime: 24,
+    class: 'cavalry',
+    radius: 11,
+  },
+  Monk: {
+    name: '僧侶',
+    hp: 30,
+    attack: 0,
+    armor: 0,
+    range: 0,
+    speed: 45,
+    cost: { gold: 100 },
+    trainTime: 24,
+    requiresAge: 2,
+    class: 'monk',
+    radius: 9,
+    healRange: 4 * TILE,
+    healRate: 5,
+    convertRange: 5 * TILE,
+    convertTickSeconds: 1.6,
+    convertBaseChance: 0.22,
+    carryCap: 1,
+  },
+  BatteringRam: {
+    name: '撞城槌',
+    hp: 175,
+    attack: 2,
+    armor: 5,
+    range: 0,
+    speed: 35,
+    cost: { wood: 160, gold: 75 },
+    trainTime: 30,
+    requiresAge: 2,
+    class: 'siege',
+    radius: 12,
+    bonusVsBuilding: 150,
+  },
+  Mangonel: {
+    name: '投石車',
+    hp: 60,
+    attack: 20,
+    armor: 0,
+    range: 4 * TILE,
+    speed: 40,
+    cost: { wood: 160, gold: 135 },
+    trainTime: 36,
+    requiresAge: 2,
+    class: 'siege',
+    radius: 11,
+    projectileSpeed: 250,
+    bonusVsBuilding: 25,
+    upgradeTo: 'Trebuchet',
+  },
+  Trebuchet: {
+    name: '拋石機',
+    hp: 70,
+    attack: 30,
+    armor: 0,
+    range: 6 * TILE,
+    speed: 30,
+    cost: { wood: 200, gold: 200 },
+    trainTime: 40,
+    class: 'siege',
+    radius: 11,
+    projectileSpeed: 220,
+    bonusVsBuilding: 60,
   },
 };
 
-// 兵營/馬廄/射箭場內可研究的兵種升級（花費+時間），觸發後把某類別已存在單位全部替換數值並改變之後訓練的單位種類
+// 兵營/馬廄/射箭場/攻城作坊內可研究的兵種升級（花費+時間），
+// 觸發後把某類別已存在單位全部替換數值並改變之後訓練的單位種類
 const UNIT_UPGRADES = {
   Swordsman: { name: '劍士升級', cost: { food: 100, gold: 30 }, time: 20, requiresAge: 1, from: 'Militia', building: 'Barracks' },
   LongSwordsman: { name: '長劍士升級', cost: { food: 150, gold: 60 }, time: 25, requiresAge: 2, from: 'Swordsman', building: 'Barracks' },
+  Champion: { name: '冠軍兵升級', cost: { food: 200, gold: 100 }, time: 30, requiresAge: 3, from: 'LongSwordsman', building: 'Barracks' },
+  Halberdier: { name: '長戟兵升級', cost: { food: 100, wood: 50 }, time: 25, requiresAge: 3, from: 'Spearman', building: 'Barracks' },
   Crossbowman: { name: '弩手升級', cost: { wood: 100, gold: 80 }, time: 25, requiresAge: 2, from: 'Archer', building: 'ArcheryRange' },
+  Arbalest: { name: '強弩手升級', cost: { wood: 50, gold: 100 }, time: 28, requiresAge: 3, from: 'Crossbowman', building: 'ArcheryRange' },
   Knight: { name: '騎士升級', cost: { food: 150, gold: 100 }, time: 25, requiresAge: 2, from: 'Scout', building: 'Stable' },
+  Paladin: { name: '聖騎士升級', cost: { food: 200, gold: 150 }, time: 30, requiresAge: 3, from: 'Knight', building: 'Stable' },
+  Trebuchet: { name: '拋石機升級', cost: { wood: 200, gold: 150 }, time: 35, requiresAge: 3, from: 'Mangonel', building: 'SiegeWorkshop' },
 };
 
-// 鐵匠鋪科技：對特定兵種類別加成攻擊/護甲
+// 各種建築內可研究的科技：
+// - 鐵匠鋪：步兵/弓兵/騎兵的攻擊、護甲、速度加成
+// - 大學：弓兵/攻城單位攻擊、建築護甲、訓練速度
+// - 修道院：僧侶治療/感化效率、僧侶生命
 const TECHS = {
-  Forging: { name: '鍛造術（步兵攻擊+2）', cost: { food: 150, gold: 0 }, time: 20, requiresAge: 1, effect: { class: 'infantry', attack: 2 } },
-  ScaleMailArmor: { name: '鱗甲術（步兵護甲+1）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'infantry', armor: 1 } },
-  Fletching: { name: '箭術（弓兵攻擊+2）', cost: { wood: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'archer', attack: 2 } },
-  BitDesign: { name: '馬具術（騎兵速度+15%）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, effect: { class: 'cavalry', speedMul: 1.15 } },
+  Forging: { name: '鍛造術（步兵攻擊+2）', cost: { food: 150, gold: 0 }, time: 20, requiresAge: 1, building: 'Blacksmith', effect: { class: 'infantry', attack: 2 } },
+  ScaleMailArmor: { name: '鱗甲術（步兵護甲+1）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, building: 'Blacksmith', effect: { class: 'infantry', armor: 1 } },
+  Fletching: { name: '箭術（弓兵攻擊+2）', cost: { wood: 100, gold: 50 }, time: 20, requiresAge: 1, building: 'Blacksmith', effect: { class: 'archer', attack: 2 } },
+  BitDesign: { name: '馬具術（騎兵速度+15%）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 1, building: 'Blacksmith', effect: { class: 'cavalry', speedMul: 1.15 } },
+  Ballistics: { name: '彈道學（弓兵攻擊+2）', cost: { food: 150, gold: 100 }, time: 25, requiresAge: 2, building: 'University', effect: { class: 'archer', attack: 2 } },
+  Masonry: { name: '石造術（建築護甲+2）', cost: { wood: 150, gold: 50 }, time: 25, requiresAge: 2, building: 'University', effect: { buildingArmor: 2 } },
+  SiegeEngineers: { name: '攻城工程（攻城單位攻擊+6）', cost: { food: 200, gold: 150 }, time: 30, requiresAge: 3, building: 'University', effect: { class: 'siege', attack: 6 } },
+  TreadmillCrane: { name: '踏輪起重機（訓練速度+20%）', cost: { wood: 200, gold: 100 }, time: 25, requiresAge: 2, building: 'University', effect: { trainSpeedMul: 0.8 } },
+  HerbalMedicine: { name: '草藥學（僧侶治療速度+100%）', cost: { food: 100, gold: 50 }, time: 20, requiresAge: 2, building: 'Monastery', effect: { healRateMul: 2 } },
+  Sanctity: { name: '神聖性（僧侶生命+20）', cost: { food: 100, gold: 100 }, time: 25, requiresAge: 2, building: 'Monastery', effect: { class: 'monk', hpAdd: 20 } },
 };
 
 const RESOURCE_TYPES = ['wood', 'food', 'gold'];
@@ -475,6 +778,94 @@ const RESOURCE_TYPES = ['wood', 'food', 'gold'];
 const STARTING_RESOURCES = { wood: 200, food: 200, gold: 100 };
 const STARTING_POP_CAP = 5;
 const MAX_POP_CAP = 100;
+const STARTING_VILLAGERS = 3;
+
+// 市場交易：賣出得到「基礎匯率 × (1-稅率)」的黃金，買進要花「基礎匯率 × (1+稅率)」的黃金
+const MARKET_BASE_RATE = 0.7;
+const MARKET_TAX = 0.3;
+const MARKET_TRADE_AMOUNT = 100;
+
+// 聖物：地圖上散落的中立拾取物，僧侶撿回修道院後每座聖物提供穩定黃金收入
+const RELIC_COUNT = 6;
+const RELIC_GOLD_PER_SECOND = 0.35;
+
+// 奇觀勝利：奇觀完工後開始倒數，撐到時間結束即獲勝；奇觀被摧毀則倒數取消
+const WONDER_VICTORY_SECONDS = 150;
+
+// 難度預設：影響電腦的資源效率、出兵積極度、決策頻率
+const DIFFICULTIES = {
+  easy: { name: '簡單', resourceMul: 0.75, aggressionMul: 0.6, tickInterval: 2.6, startAttackGroup: 9 },
+  normal: { name: '普通', resourceMul: 1.0, aggressionMul: 1.0, tickInterval: 2.0, startAttackGroup: 6 },
+  hard: { name: '困難', resourceMul: 1.3, aggressionMul: 1.4, tickInterval: 1.5, startAttackGroup: 5 },
+};
+
+const PLAYER_COLORS = [
+  { light: '#5b9bf5', mid: '#3b82f6', dark: '#1d4ed8', darkest: '#123a8a', name: '藍色' },
+  { light: '#f5726b', mid: '#ef4444', dark: '#b91c1c', darkest: '#7a1010', name: '紅色' },
+  { light: '#7bdb7b', mid: '#4caf50', dark: '#2e7d32', darkest: '#1b4d1f', name: '綠色' },
+  { light: '#f5d76b', mid: '#e0b020', dark: '#a87c10', darkest: '#6e4f08', name: '黃色' },
+];
+
+// ===== civs.js =====
+// 文明系統：每個文明提供 2~3 項固定加成，開局畫面選擇後套用到玩家身上。
+// bonuses 欄位說明：
+//   extraStartRes    開局額外資源
+//   extraVillagers   開局額外村民數
+//   popCapBonus      人口上限加成（每座房屋/城鎮中心提供的人口再加這個值）
+//   gatherMul        {wood,food,gold} 採集速度倍率
+//   buildSpeedMul    村民建造速度倍率
+//   trainSpeedMul    訓練單位速度倍率（數值越小訓練越快）
+//   tradeTaxMul      市場交易稅率倍率（數值越小手續費越低）
+//   monkEfficiencyMul 僧侶治療/感化效率倍率
+//   defenseHpMul     城牆/城門/箭塔/奇觀生命值倍率
+//   classBonus       [{class, attack, armor, speedMul}] 開局即套用、如同免費科技的永久加成
+const CIVS = {
+  Franks: {
+    name: '法蘭克人',
+    desc: '騎兵攻擊+2，農場與漿果採集速度+15%',
+    gatherMul: { wood: 1, food: 1.15, gold: 1 },
+    classBonus: [{ class: 'cavalry', attack: 2 }],
+  },
+  Byzantines: {
+    name: '拜占庭人',
+    desc: '步兵與弓兵護甲+1，僧侶治療/感化效率+30%',
+    monkEfficiencyMul: 1.3,
+    classBonus: [{ class: 'infantry', armor: 1 }, { class: 'archer', armor: 1 }],
+  },
+  Teutons: {
+    name: '條頓人',
+    desc: '城牆/城門/箭塔生命值+30%，步兵護甲+1',
+    defenseHpMul: 1.3,
+    classBonus: [{ class: 'infantry', armor: 1 }],
+  },
+  Celts: {
+    name: '賽爾特人',
+    desc: '攻城單位移動速度+30%，伐木速度+15%',
+    gatherMul: { wood: 1.15, food: 1, gold: 1 },
+    classBonus: [{ class: 'siege', speedMul: 1.3 }],
+  },
+  Chinese: {
+    name: '中國人',
+    desc: '開局多 1 名村民，但黃金採集速度-10%',
+    extraVillagers: 1,
+    extraStartRes: { food: -40 },
+    gatherMul: { wood: 1, food: 1, gold: 0.9 },
+  },
+  Saracens: {
+    name: '薩拉森人',
+    desc: '市場交易手續費減半，弓箭手攻擊+1',
+    tradeTaxMul: 0.5,
+    classBonus: [{ class: 'archer', attack: 1 }],
+  },
+};
+
+const CIV_KEYS = Object.keys(CIVS);
+
+function getCivBonus(civKey, field, fallback) {
+  const civ = CIVS[civKey];
+  if (!civ || civ[field] === undefined) return fallback;
+  return civ[field];
+}
 
 // ===== map.js =====
 let nextResId = 1;
@@ -485,6 +876,10 @@ class GameMap {
     this.h = MAP_H;
     this.blocked = new Uint8Array(this.w * this.h);
     this.resources = [];
+    this.relics = [];
+    // 戰爭迷霧：explored 一旦探索過就不會再變回未探索；visibleNow 每個遊戲 tick 重新計算。
+    this.explored = new Uint8Array(this.w * this.h);
+    this.visibleNow = new Uint8Array(this.w * this.h);
   }
 
   idx(tx, ty) {
@@ -542,6 +937,31 @@ class GameMap {
   removeResource(r) {
     const i = this.resources.indexOf(r);
     if (i >= 0) this.resources.splice(i, 1);
+  }
+
+  addRelic(x, y) {
+    const r = { id: nextResId++, x, y, radius: 12, carriedBy: null };
+    this.relics.push(r);
+    return r;
+  }
+
+  removeRelic(r) {
+    const i = this.relics.indexOf(r);
+    if (i >= 0) this.relics.splice(i, 1);
+  }
+
+  nearestRelic(x, y) {
+    let best = null;
+    let bestD = Infinity;
+    for (const r of this.relics) {
+      if (r.carriedBy) continue;
+      const d = (r.x - x) ** 2 + (r.y - y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = r;
+      }
+    }
+    return best;
   }
 
   nearestResource(type, x, y, excludeDepleted = true) {
@@ -654,48 +1074,112 @@ function scatterCluster(map, type, cx, cy, count, spread, amount) {
   return nodes;
 }
 
-function generateMap() {
+// 依玩家人數 (2~4) 產生對應數量的出生角落，並在每個角落外側散布資源，
+// 中央留一片中立資源與聖物爭奪區——參考手機帝國類遊戲常見的「四角對稱」地圖設計。
+function generateMap(numPlayers) {
   const map = new GameMap();
   const worldW = map.w * TILE;
   const worldH = map.h * TILE;
+  const cx = worldW / 2;
+  const cy = worldH / 2;
 
-  const playerStart = { x: 3 * TILE, y: (map.h - 3) * TILE };
-  const aiStart = { x: (map.w - 3) * TILE, y: 3 * TILE };
+  const corners = [
+    { x: 3 * TILE, y: (map.h - 3) * TILE },
+    { x: (map.w - 3) * TILE, y: 3 * TILE },
+    { x: 3 * TILE, y: 3 * TILE },
+    { x: (map.w - 3) * TILE, y: (map.h - 3) * TILE },
+  ];
+  const n = Math.max(2, Math.min(4, numPlayers || 2));
+  const starts = corners.slice(0, n);
 
-  for (const start of [playerStart, aiStart]) {
-    scatterCluster(map, 'wood', start.x + (start === playerStart ? 220 : -220), start.y + (start === playerStart ? -60 : 60), 10, 90, 250);
-    scatterCluster(map, 'gold', start.x + (start === playerStart ? 260 : -260), start.y + (start === playerStart ? 40 : -40), 4, 40, 700);
-    scatterCluster(map, 'food', start.x + (start === playerStart ? 60 : -60), start.y + (start === playerStart ? -260 : 260), 5, 50, 250);
+  for (const start of starts) {
+    const dx = start.x - cx;
+    const dy = start.y - cy;
+    const d = Math.hypot(dx, dy) || 1;
+    const ux = dx / d;
+    const uy = dy / d;
+    scatterCluster(map, 'wood', start.x + ux * 140 - uy * 80, start.y + uy * 140 + ux * 80, 10, 90, 250);
+    scatterCluster(map, 'gold', start.x + ux * 190 + uy * 60, start.y + uy * 190 - ux * 60, 4, 40, 700);
+    scatterCluster(map, 'food', start.x + ux * 60 + uy * 170, start.y + uy * 60 - ux * 170, 5, 50, 250);
   }
 
-  // 中央中立資源
-  scatterCluster(map, 'wood', worldW / 2, worldH / 2, 14, 200, 250);
-  scatterCluster(map, 'gold', worldW / 2 + 150, worldH / 2 - 100, 4, 60, 700);
-  scatterCluster(map, 'gold', worldW / 2 - 150, worldH / 2 + 100, 4, 60, 700);
-  scatterCluster(map, 'food', worldW / 2 - 100, worldH / 2 - 150, 4, 60, 250);
-  scatterCluster(map, 'food', worldW / 2 + 100, worldH / 2 + 150, 4, 60, 250);
+  // 中央中立資源與聖物爭奪區
+  scatterCluster(map, 'wood', cx, cy, 14, 230, 250);
+  scatterCluster(map, 'gold', cx + 160, cy - 110, 4, 60, 700);
+  scatterCluster(map, 'gold', cx - 160, cy + 110, 4, 60, 700);
+  scatterCluster(map, 'food', cx - 110, cy - 160, 4, 60, 250);
+  scatterCluster(map, 'food', cx + 110, cy + 160, 4, 60, 250);
+  if (starts.length > 2) {
+    scatterCluster(map, 'gold', cx + 160, cy + 110, 3, 50, 700);
+    scatterCluster(map, 'food', cx - 160, cy - 110, 4, 50, 250);
+  }
 
-  return { map, playerStart, aiStart };
+  for (let i = 0; i < RELIC_COUNT; i++) {
+    const ang = (i / RELIC_COUNT) * Math.PI * 2 + Math.random() * 0.4;
+    const r = worldW * 0.2 + Math.random() * worldW * 0.14;
+    const x = Math.min(worldW - 120, Math.max(120, cx + Math.cos(ang) * r));
+    const y = Math.min(worldH - 120, Math.max(120, cy + Math.sin(ang) * r));
+    map.addRelic(x, y);
+  }
+
+  return { map, starts };
 }
 
 // ===== entities.js =====
 let nextEntityId = 1;
 
 class Player {
-  constructor(id, name, isAI) {
+  constructor(id, name, isAI, civKey, difficulty) {
     this.id = id;
     this.name = name;
     this.isAI = isAI;
+    this.civKey = civKey || CIV_KEYS[0];
+    this.civ = CIVS[this.civKey] || {};
+    this.difficulty = difficulty || 'normal';
+    this.color = PLAYER_COLORS[id % PLAYER_COLORS.length];
+
     this.resources = { ...STARTING_RESOURCES };
+    const extraRes = this.civ.extraStartRes || {};
+    for (const k in extraRes) {
+      this.resources[k] = Math.max(0, (this.resources[k] || 0) + extraRes[k]);
+    }
+    this.extraVillagers = this.civ.extraVillagers || 0;
+
     this.popCap = STARTING_POP_CAP;
     this.age = 0;
-    this.ageResearch = null; // {timeLeft, total}
+    this.ageResearch = null; // {timeLeft, total, toAge}
     this.buildings = [];
     this.units = [];
     this.techsResearched = new Set();
-    this.unitLine = { Militia: 'Militia', Archer: 'Archer', Scout: 'Scout' }; // 目前該兵種線最新型態
-    this.bonus = {}; // class -> {attack, armor, speedMul}
+    // 目前各兵種線最新型態，訓練按鈕與升級研究都依這個對照表決定實際要生產/升級的單位
+    this.unitLine = { Militia: 'Militia', Archer: 'Archer', Scout: 'Scout', Mangonel: 'Mangonel' };
+    this.bonus = {}; // class -> {attack, armor, speedMul, hp}
+    this.buildingArmorBonus = 0;
+    this.trainSpeedMul = this.civ.trainSpeedMul || 1;
+    this.buildSpeedMul = this.civ.buildSpeedMul || 1;
+    this.tradeTaxMul = this.civ.tradeTaxMul || 1;
+    this.monkEfficiencyMul = this.civ.monkEfficiencyMul || 1;
+    this.defenseHpMul = this.civ.defenseHpMul || 1;
+    this.healRateMul = 1;
+
+    const gm = this.civ.gatherMul || {};
+    this.gatherMul = { wood: gm.wood || 1, food: gm.food || 1, gold: gm.gold || 1 };
+    if (isAI) {
+      const diff = DIFFICULTIES[this.difficulty] || DIFFICULTIES.normal;
+      this.gatherMul.wood *= diff.resourceMul;
+      this.gatherMul.food *= diff.resourceMul;
+      this.gatherMul.gold *= diff.resourceMul;
+    }
+
+    this.relics = 0; // 已收集聖物數量（影響修道院黃金收入）
+    this.wonderBuilding = null;
+    this.wonderCountdown = null; // {timeLeft, total}
     this.defeated = false;
+    this.stats = { kills: 0, unitsLost: 0 };
+
+    if (this.civ.classBonus) {
+      for (const eff of this.civ.classBonus) this.applyTechEffect(eff);
+    }
   }
 
   currentPop() {
@@ -716,15 +1200,21 @@ class Player {
   }
 
   getBonus(cls) {
-    return this.bonus[cls] || { attack: 0, armor: 0, speedMul: 1 };
+    return this.bonus[cls] || { attack: 0, armor: 0, speedMul: 1, hp: 0 };
   }
 
   applyTechEffect(effect) {
-    const b = this.bonus[effect.class] || { attack: 0, armor: 0, speedMul: 1 };
-    if (effect.attack) b.attack += effect.attack;
-    if (effect.armor) b.armor += effect.armor;
-    if (effect.speedMul) b.speedMul *= effect.speedMul;
-    this.bonus[effect.class] = b;
+    if (effect.class) {
+      const b = this.bonus[effect.class] || { attack: 0, armor: 0, speedMul: 1, hp: 0 };
+      if (effect.attack) b.attack += effect.attack;
+      if (effect.armor) b.armor += effect.armor;
+      if (effect.speedMul) b.speedMul *= effect.speedMul;
+      if (effect.hpAdd) b.hp += effect.hpAdd;
+      this.bonus[effect.class] = b;
+    }
+    if (effect.buildingArmor) this.buildingArmorBonus += effect.buildingArmor;
+    if (effect.trainSpeedMul) this.trainSpeedMul *= effect.trainSpeedMul;
+    if (effect.healRateMul) this.healRateMul *= effect.healRateMul;
   }
 
   unitStats(type) {
@@ -732,6 +1222,7 @@ class Player {
     const bonus = this.getBonus(base.class);
     return {
       ...base,
+      hp: base.hp + (bonus.hp || 0),
       attack: base.attack + bonus.attack,
       armor: base.armor + bonus.armor,
       speed: base.speed * bonus.speedMul,
@@ -741,32 +1232,39 @@ class Player {
 
 function createUnit(owner, type, x, y) {
   const base = UNITS[type];
+  const stats = owner.unitStats(type);
   return {
     id: nextEntityId++,
     kind: 'unit',
     owner,
     type,
     x, y,
-    hp: base.hp,
-    maxHp: base.hp,
+    hp: stats.hp,
+    maxHp: stats.hp,
     stats: base,
     radius: base.radius,
     path: [],
     task: null,
     attackCooldown: 0,
     carry: { type: null, amount: 0 },
+    stance: 'aggressive', // 'aggressive'：發現敵人主動迎戰／'stand'：原地駐守，只有被直接下令才會攻擊
     selected: false,
     facing: 0,
     repathTimer: 0,
     flashTimer: 0,
+    healCooldown: 0,
+    convertTimer: 0,
   };
 }
 
 function createBuilding(owner, type, x, y, opts = {}) {
   const def = BUILDINGS[type];
-  const maxHp = def.hp;
+  let maxHp = def.hp;
+  if (def.isWall || def.isGate || def.isDefense || def.isWonder) {
+    maxHp = Math.round(maxHp * (owner.defenseHpMul || 1));
+  }
   const constructing = !opts.instant;
-  return {
+  const building = {
     id: nextEntityId++,
     kind: 'building',
     owner,
@@ -784,7 +1282,12 @@ function createBuilding(owner, type, x, y, opts = {}) {
     selected: false,
     rally: null,
     flashTimer: 0,
+    attackCooldown: 0,
   };
+  if (def.isGate) building.open = false;
+  if (def.isWonder) building.wonderActive = false;
+  if (def.relicDropOff) building.relicsHeld = 0;
+  return building;
 }
 
 function dist(a, b) {
@@ -805,7 +1308,9 @@ function buildingProximity(pos, building) {
 
 function moveUnitTowardsPath(unit, dt) {
   if (!unit.path || unit.path.length === 0) return true;
-  let remaining = unit.stats.speed * dt;
+  // 移動速度要用 effectiveStats（套用科技/文明加成後的即時數值），
+  // 否則像法蘭克人的騎兵加成、賽爾特人的攻城單位加速等科技/文明效果就不會真的影響移動。
+  let remaining = effectiveStats(unit).speed * dt;
   while (remaining > 0 && unit.path.length > 0) {
     const wp = unit.path[0];
     const dx = wp.x - unit.x;
@@ -830,6 +1335,9 @@ function damageOf(attackerStats, targetStats, targetClass) {
   let atk = attackerStats.attack;
   if (attackerStats.bonusVs && attackerStats.bonusVs[targetClass]) {
     atk += attackerStats.bonusVs[targetClass];
+  }
+  if (targetClass === 'building' && attackerStats.bonusVsBuilding) {
+    atk += attackerStats.bonusVsBuilding;
   }
   const dmg = atk - targetStats.armor;
   return Math.max(1, dmg);
@@ -875,7 +1383,7 @@ const _data = { BUILDINGS, UNITS, UNIT_UPGRADES, TECHS, AGES, RESOURCE_TYPES };
 
 // ===== sim.js =====
 const AGGRO_RANGE = 6 * TILE;
-const ATTACK_INTERVAL = { infantry: 1.5, cavalry: 1.4, archer: 1.9, villager: 2.2 };
+const ATTACK_INTERVAL = { infantry: 1.5, cavalry: 1.4, archer: 1.9, villager: 2.2, siege: 2.4 };
 
 function findDropOff(player, resourceType, fx, fy) {
   let best = null;
@@ -964,6 +1472,7 @@ function dealDamage(state, target, dmg, attackerOwner) {
   target.flashTimer = 0.15;
   if (target.hp <= 0) {
     removeEntity(state, target);
+    if (attackerOwner && attackerOwner !== target.owner) attackerOwner.stats.kills++;
   }
 }
 
@@ -972,11 +1481,46 @@ function removeEntity(state, entity) {
   if (entity.kind === 'unit') {
     const i = owner.units.indexOf(entity);
     if (i >= 0) owner.units.splice(i, 1);
+    owner.stats.unitsLost++;
+    // 僧侶死亡時，手上的聖物任務要釋放，避免聖物被永久鎖住撿不到
+    if (entity.task && entity.task.type === 'relic') {
+      const relic = entity.task.relic;
+      if (relic && relic.carriedBy === entity) relic.carriedBy = null;
+      if (entity.carry && entity.carry.type === 'relic' && entity.carry.amount > 0) {
+        state.map.addRelic(entity.x, entity.y);
+      }
+    }
   } else {
     const i = owner.buildings.indexOf(entity);
     if (i >= 0) owner.buildings.splice(i, 1);
     state.map.setFootprint(entity.x, entity.y, entity.sizeTiles, false);
   }
+}
+
+// 城門：手動開關。開啟時任何人都能通過（跟移除城牆一樣），關閉時恢復阻擋。
+function toggleGate(map, building) {
+  if (!building.def.isGate) return;
+  building.open = !building.open;
+  map.setFootprint(building.x, building.y, building.sizeTiles, !building.open);
+}
+
+// 具備攻擊能力的建築（箭塔）：每隔 attackInterval 秒對射程內最近的敵人開火一次。
+function updateDefenseBuildingAttack(state, building, dt) {
+  if (building.attackCooldown > 0) return;
+  const enemy = findNearestEnemy(state, building.owner.id, building.x, building.y, building.def.range);
+  if (!enemy) return;
+  const targetClass = enemy.kind === 'unit' ? enemy.stats.class : 'building';
+  const targetArmor = enemy.kind === 'unit' ? effectiveStats(enemy).armor : (enemy.owner.buildingArmorBonus || 0);
+  const dmg = damageOf({ attack: building.def.attack }, { armor: targetArmor }, targetClass);
+  if (building.def.projectileSpeed) {
+    state.projectiles.push({
+      x: building.x, y: building.y - buildingRadius(building) * 0.4,
+      target: enemy, dmg, speed: building.def.projectileSpeed, owner: building.owner,
+    });
+  } else {
+    dealDamage(state, enemy, dmg, building.owner);
+  }
+  building.attackCooldown = building.def.attackInterval || 1.5;
 }
 
 function targetRadiusOf(target) {
@@ -1007,7 +1551,7 @@ function updateAttackTask(state, unit, dt) {
     unit.facing = Math.atan2(target.y - unit.y, target.x - unit.x);
     if (unit.attackCooldown <= 0) {
       const targetClass = target.kind === 'unit' ? target.stats.class : 'building';
-      const targetArmor = target.kind === 'unit' ? effectiveStats(target).armor : 0;
+      const targetArmor = target.kind === 'unit' ? effectiveStats(target).armor : (target.owner.buildingArmorBonus || 0);
       const dmg = damageOf(stats, { armor: targetArmor }, targetClass);
       if (stats.range > 0) {
         spawnProjectile(state, unit, target, dmg);
@@ -1050,7 +1594,8 @@ function updateGatherTask(state, unit, dt) {
       if (task.dropoff) pathToBuilding(map, unit, task.dropoff);
       return;
     }
-    const take = Math.min(stats.gatherRate * dt, res.amount, stats.carryCap - unit.carry.amount);
+    const gatherMul = unit.owner.gatherMul[task.resourceType] || 1;
+    const take = Math.min(stats.gatherRate * gatherMul * dt, res.amount, stats.carryCap - unit.carry.amount);
     res.amount -= take;
     unit.carry.type = task.resourceType;
     unit.carry.amount += take;
@@ -1112,7 +1657,8 @@ function updateGatherFarmTask(state, unit, dt) {
       }
     }
   } else if (task.phase === 'gathering') {
-    const take = Math.min(stats.gatherRate * dt, farm.foodLeft, stats.carryCap - unit.carry.amount);
+    const gatherMul = unit.owner.gatherMul.food || 1;
+    const take = Math.min(stats.gatherRate * gatherMul * dt, farm.foodLeft, stats.carryCap - unit.carry.amount);
     farm.foodLeft -= take;
     unit.carry.type = 'food';
     unit.carry.amount += take;
@@ -1166,11 +1712,12 @@ function updateBuildTask(state, unit, dt) {
       unit.task = null;
       return;
     }
-    const rate = (building.maxHp * 0.9) / (building.def.buildTime || 10);
+    const rate = ((building.maxHp * 0.9) / (building.def.buildTime || 10)) * (unit.owner.buildSpeedMul || 1);
     building.hp = Math.min(building.maxHp, building.hp + rate * dt);
     if (building.hp >= building.maxHp) {
       building.hp = building.maxHp;
       building.constructing = false;
+      if (building.def.isWonder) startWonderCountdown(building.owner, building);
       unit.task = null;
     }
   }
@@ -1182,7 +1729,7 @@ function updateUnit(state, unit, dt) {
 
   if (!unit.task) {
     const cls = unit.stats.class;
-    if (cls !== 'villager') {
+    if (cls !== 'villager' && cls !== 'monk' && unit.stance !== 'stand') {
       const enemy = findNearestEnemy(state, unit.owner.id, unit.x, unit.y, AGGRO_RANGE);
       if (enemy) {
         issueAttack(state.map, unit, enemy);
@@ -1209,6 +1756,15 @@ function updateUnit(state, unit, dt) {
     case 'build':
       updateBuildTask(state, unit, dt);
       break;
+    case 'heal':
+      updateHealTask(state, unit, dt);
+      break;
+    case 'convert':
+      updateConvertTask(state, unit, dt);
+      break;
+    case 'relic':
+      updateRelicTask(state, unit, dt);
+      break;
     default:
       unit.task = null;
   }
@@ -1228,7 +1784,9 @@ function spawnTrainedUnit(state, player, building, type) {
 
 function updateBuilding(state, player, building, dt) {
   if (building.flashTimer > 0) building.flashTimer -= dt;
+  if (building.attackCooldown > 0) building.attackCooldown -= dt;
   if (!building.constructing) {
+    if (building.def.attack) updateDefenseBuildingAttack(state, building, dt);
     if (building.trainQueue.length > 0) {
       const item = building.trainQueue[0];
       if (player.currentPop() < player.popCap) {
@@ -1301,7 +1859,8 @@ function startTraining(player, building, type) {
   if (!player.canAfford(def.cost || {})) return false;
   if (building.trainQueue.length >= 10) return false;
   player.pay(def.cost || {});
-  building.trainQueue.push({ type, totalTime: def.trainTime || 10 });
+  const totalTime = (def.trainTime || 10) * (player.trainSpeedMul || 1);
+  building.trainQueue.push({ type, totalTime });
   return true;
 }
 
@@ -1364,13 +1923,284 @@ function recalcPopCap(player) {
   player.popCap = Math.min(MAX_POP_CAP, Math.max(5, cap));
 }
 
+// ===== market.js =====
+// 市場交易：賣出多餘的木材/食物換黃金，或用黃金買緊缺的資源。
+// 每次交易固定量（MARKET_TRADE_AMOUNT），手續費由 MARKET_TAX 與文明的 tradeTaxMul 決定。
+function hasUsableMarket(player) {
+  return player.buildings.some((b) => b.type === 'Market' && !b.constructing);
+}
+
+function marketSellRate(player) {
+  return MARKET_BASE_RATE * (1 - MARKET_TAX * player.tradeTaxMul);
+}
+
+function marketBuyRate(player) {
+  return MARKET_BASE_RATE * (1 + MARKET_TAX * player.tradeTaxMul);
+}
+
+function sellResource(player, type) {
+  if (type === 'gold') return false;
+  if (!hasUsableMarket(player)) return false;
+  if ((player.resources[type] || 0) < MARKET_TRADE_AMOUNT) return false;
+  player.resources[type] -= MARKET_TRADE_AMOUNT;
+  player.resources.gold = (player.resources.gold || 0) + MARKET_TRADE_AMOUNT * marketSellRate(player);
+  return true;
+}
+
+function buyResource(player, type) {
+  if (type === 'gold') return false;
+  if (!hasUsableMarket(player)) return false;
+  const goldCost = MARKET_TRADE_AMOUNT * marketBuyRate(player);
+  if ((player.resources.gold || 0) < goldCost) return false;
+  player.resources.gold -= goldCost;
+  player.resources[type] = (player.resources[type] || 0) + MARKET_TRADE_AMOUNT;
+  return true;
+}
+
+// ===== monastery.js =====
+// 修道院／僧侶／聖物系統：
+// - 僧侶可以治療友軍單位、感化（策反）敵方單位
+// - 聖物散落在地圖上，僧侶撿回有 relicDropOff 標記的建築（修道院）即可獲得穩定黃金收入
+function issueHeal(map, unit, target) {
+  unit.task = { type: 'heal', target };
+  unit.path = [];
+}
+
+function issueConvert(map, unit, target) {
+  unit.task = { type: 'convert', target };
+  unit.convertTimer = 0;
+  unit.path = [];
+}
+
+function issueGatherRelic(map, unit, relic) {
+  relic.carriedBy = unit; // 立刻認領，避免其他僧侶重複去搶同一個聖物
+  unit.task = { type: 'relic', relic, phase: 'toRelic' };
+  pathTo(map, unit, relic.x, relic.y);
+}
+
+function findRelicDropOff(player, fx, fy) {
+  let best = null;
+  let bestD = Infinity;
+  for (const b of player.buildings) {
+    if (b.constructing || !b.def.relicDropOff) continue;
+    const d = dist({ x: fx, y: fy }, b);
+    if (d < bestD) {
+      bestD = d;
+      best = b;
+    }
+  }
+  return best;
+}
+
+function updateHealTask(state, unit, dt) {
+  const task = unit.task;
+  const target = task.target;
+  if (!target || target.hp <= 0 || target.owner.units.indexOf(target) < 0 || target.hp >= target.maxHp) {
+    unit.task = null;
+    return;
+  }
+  const stats = effectiveStats(unit);
+  const d = dist(unit, target);
+  if (d > stats.healRange) {
+    unit.repathTimer -= dt;
+    if (unit.path.length === 0 || unit.repathTimer <= 0) {
+      pathTo(state.map, unit, target.x, target.y);
+      unit.repathTimer = 0.8;
+    }
+    moveUnitTowardsPath(unit, dt);
+  } else {
+    unit.path = [];
+    const healMul = unit.owner.healRateMul * (unit.owner.monkEfficiencyMul || 1);
+    target.hp = Math.min(target.maxHp, target.hp + stats.healRate * healMul * dt);
+    if (target.hp >= target.maxHp) unit.task = null;
+  }
+}
+
+function updateConvertTask(state, unit, dt) {
+  const task = unit.task;
+  const target = task.target;
+  if (!target || target.hp <= 0 || target.owner.units.indexOf(target) < 0 || target.owner === unit.owner) {
+    unit.task = null;
+    return;
+  }
+  const stats = effectiveStats(unit);
+  const d = dist(unit, target);
+  if (d > stats.convertRange) {
+    unit.repathTimer -= dt;
+    if (unit.path.length === 0 || unit.repathTimer <= 0) {
+      pathTo(state.map, unit, target.x, target.y);
+      unit.repathTimer = 0.8;
+    }
+    moveUnitTowardsPath(unit, dt);
+    return;
+  }
+  unit.path = [];
+  unit.convertTimer -= dt;
+  if (unit.convertTimer <= 0) {
+    unit.convertTimer = stats.convertTickSeconds;
+    const chance = Math.min(0.9, stats.convertBaseChance * (unit.owner.monkEfficiencyMul || 1));
+    if (Math.random() < chance) {
+      const oldOwner = target.owner;
+      const idx = oldOwner.units.indexOf(target);
+      if (idx >= 0) oldOwner.units.splice(idx, 1);
+      target.owner = unit.owner;
+      target.task = null;
+      target.path = [];
+      unit.owner.units.push(target);
+      unit.task = null;
+    }
+  }
+}
+
+function updateRelicTask(state, unit, dt) {
+  const task = unit.task;
+  const relic = task.relic;
+  if (task.phase === 'toRelic') {
+    if (!relic || (relic.carriedBy && relic.carriedBy !== unit)) {
+      unit.task = null;
+      return;
+    }
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = dist(unit, relic);
+      if (d <= relic.radius + unit.radius + 6) {
+        state.map.removeRelic(relic);
+        unit.carry = { type: 'relic', amount: 1 };
+        task.phase = 'toMonastery';
+        task.dropoff = findRelicDropOff(unit.owner, unit.x, unit.y);
+        if (task.dropoff) pathToBuilding(state.map, unit, task.dropoff);
+      } else {
+        pathTo(state.map, unit, relic.x, relic.y);
+      }
+    }
+  } else if (task.phase === 'toMonastery') {
+    if (!task.dropoff || task.dropoff.hp <= 0) {
+      task.dropoff = findRelicDropOff(unit.owner, unit.x, unit.y);
+      if (task.dropoff) pathToBuilding(state.map, unit, task.dropoff);
+      else return;
+    }
+    const arrived = moveUnitTowardsPath(unit, dt);
+    if (arrived) {
+      const d = buildingProximity(unit, task.dropoff);
+      if (d <= buildingRadius(task.dropoff) + unit.radius + 6) {
+        task.dropoff.relicsHeld = (task.dropoff.relicsHeld || 0) + 1;
+        unit.owner.relics = (unit.owner.relics || 0) + 1;
+        unit.carry = { type: null, amount: 0 };
+        unit.task = null;
+      } else {
+        pathToBuilding(state.map, unit, task.dropoff);
+      }
+    }
+  }
+}
+
+function updateRelicIncome(player, dt) {
+  if (player.relics > 0) {
+    player.resources.gold = (player.resources.gold || 0) + player.relics * RELIC_GOLD_PER_SECOND * dt;
+  }
+}
+
+// ===== wonder.js =====
+// 奇觀勝利：奇觀完工後開始倒數計時，撐滿 WONDER_VICTORY_SECONDS 即獲勝；
+// 奇觀在倒數期間被摧毀（或整座城被消滅、奇觀不再存在），倒數立即取消。
+function startWonderCountdown(player, building) {
+  player.wonderBuilding = building;
+  building.wonderActive = true;
+  player.wonderCountdown = { timeLeft: WONDER_VICTORY_SECONDS, total: WONDER_VICTORY_SECONDS };
+}
+
+function updateWonderCountdown(state, player, dt) {
+  if (!player.wonderCountdown) return;
+  const b = player.wonderBuilding;
+  if (!b || b.hp <= 0 || b.owner.buildings.indexOf(b) < 0) {
+    player.wonderCountdown = null;
+    player.wonderBuilding = null;
+    return;
+  }
+  player.wonderCountdown.timeLeft -= dt;
+  if (player.wonderCountdown.timeLeft <= 0) {
+    state.ended = true;
+    state.winner = player;
+    state.winReason = 'wonder';
+  }
+}
+
+// ===== fow.js =====
+// 戰爭迷霧：只影響「人類玩家」看到的畫面（電腦對手在決策上不受影響，
+// 這跟大多數單機帝國遊戲的 AI 是一樣的簡化）。
+// - unexplored（從未看過）：完全隱藏，畫面全黑
+// - explored 但目前不在視野內：地形/資源/建築仍看得到（記得曾經探索過的樣子），
+//   但敵方「單位」會隱藏（真正的即時位置看不到）
+// - visibleNow（目前視野內）：完全正常顯示
+const UNIT_SIGHT_TILES = { villager: 4, infantry: 5, archer: 6, cavalry: 6, siege: 5, monk: 5 };
+
+function findHumanPlayer(state) {
+  return state.players.find((p) => !p.isAI) || null;
+}
+
+function updateFogOfWar(state) {
+  const map = state.map;
+  const human = findHumanPlayer(state);
+  map.visibleNow.fill(0);
+  if (!human) return;
+
+  const mark = (cx, cy, sightTiles) => {
+    const center = map.worldToTile(cx, cy);
+    const r = Math.ceil(sightTiles);
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        const nx = center.tx + dx;
+        const ny = center.ty + dy;
+        if (!map.inBounds(nx, ny)) continue;
+        const idx = map.idx(nx, ny);
+        map.visibleNow[idx] = 1;
+        map.explored[idx] = 1;
+      }
+    }
+  };
+
+  for (const u of human.units) mark(u.x, u.y, UNIT_SIGHT_TILES[u.stats.class] || 5);
+  for (const b of human.buildings) {
+    if (b.constructing) continue;
+    mark(b.x, b.y, b.def.sight || 4);
+  }
+}
+
+function isExploredWorld(map, wx, wy) {
+  const t = map.worldToTile(wx, wy);
+  if (!map.inBounds(t.tx, t.ty)) return false;
+  return map.explored[map.idx(t.tx, t.ty)] === 1;
+}
+
+function isVisibleNowWorld(map, wx, wy) {
+  const t = map.worldToTile(wx, wy);
+  if (!map.inBounds(t.tx, t.ty)) return false;
+  return map.visibleNow[map.idx(t.tx, t.ty)] === 1;
+}
+
+// 判斷某個實體（單位/建築）在目前的戰爭迷霧規則下是否應該畫出來。
+// 自己一律看得到；其他玩家的建築只要「探索過」就會顯示（不追蹤即時 HP 變化的簡化版记忆），
+// 其他玩家的單位則需要「目前就在視野內」才顯示。
+function shouldRenderEntity(state, entity) {
+  const human = findHumanPlayer(state);
+  if (!human) return true;
+  if (entity.owner === human) return true;
+  const map = state.map;
+  if (entity.kind === 'building') return isExploredWorld(map, entity.x, entity.y);
+  return isVisibleNowWorld(map, entity.x, entity.y);
+}
+
 // ===== ai.js =====
-function createAIState(homeX, homeY) {
+function createAIState(homeX, homeY, difficulty) {
+  const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal;
   return {
     homeX, homeY,
+    difficulty: difficulty || 'normal',
     tickTimer: 0,
-    attackGroupThreshold: 6,
-    lastAttackWave: 0,
+    tickInterval: diff.tickInterval,
+    attackGroupThreshold: diff.startAttackGroup,
+    aggressionMul: diff.aggressionMul,
   };
 }
 
@@ -1494,8 +2324,26 @@ function economyStep(state, ai, aiState) {
     if (!has(ai, 'ArcheryRange')) tryBuild(state, ai, aiState, 'ArcheryRange');
     else if (!has(ai, 'Stable')) tryBuild(state, ai, aiState, 'Stable');
     else if (!has(ai, 'Blacksmith')) tryBuild(state, ai, aiState, 'Blacksmith');
+    else if (!has(ai, 'Market')) tryBuild(state, ai, aiState, 'Market');
+    else if (!has(ai, 'WatchTower') && villagerCount >= 6) tryBuild(state, ai, aiState, 'WatchTower');
     else if (!has(ai, 'LumberCamp') && villagerCount >= 8) tryBuild(state, ai, aiState, 'LumberCamp');
     else if (!has(ai, 'MiningCamp') && villagerCount >= 10) tryBuild(state, ai, aiState, 'MiningCamp');
+  }
+
+  if (ai.age >= 2) {
+    if (!has(ai, 'University')) tryBuild(state, ai, aiState, 'University');
+    else if (!has(ai, 'Monastery')) tryBuild(state, ai, aiState, 'Monastery');
+    else if (!has(ai, 'SiegeWorkshop')) tryBuild(state, ai, aiState, 'SiegeWorkshop');
+    else if (ai.buildings.filter((b) => b.type === 'WatchTower').length < 2) tryBuild(state, ai, aiState, 'WatchTower');
+  }
+
+  if (ai.age >= 3 && !has(ai, 'Wonder') && ai.currentPop() >= ai.popCap - 2) {
+    tryBuild(state, ai, aiState, 'Wonder');
+  }
+
+  // 市場：黃金不足時賣一點多餘的木材換取黃金，維持軍事生產不斷炊
+  if (has(ai, 'Market') && ai.resources.gold < 150 && ai.resources.wood > 400) {
+    sellResource(ai, 'wood');
   }
 
   const tc = ai.buildings.find((b) => b.type === 'TownCenter');
@@ -1506,6 +2354,7 @@ function economyStep(state, ai, aiState) {
   if (!ai.ageResearch) {
     if (ai.age === 0 && villagerCount >= 7) startAgeUp(ai);
     else if (ai.age === 1 && villagerCount >= 12) startAgeUp(ai);
+    else if (ai.age === 2 && villagerCount >= 15 && ai.currentPop() >= ai.popCap - 4) startAgeUp(ai);
   }
 }
 
@@ -1524,6 +2373,14 @@ function militaryStep(state, ai, aiState) {
   if (stable && stable.trainQueue.length < 2) {
     startTraining(ai, stable, ai.unitLine.Scout);
   }
+  const siegeWorkshop = hasIdleBuilder(ai, 'SiegeWorkshop');
+  if (siegeWorkshop && siegeWorkshop.trainQueue.length < 2 && ai.resources.gold > 200) {
+    startTraining(ai, siegeWorkshop, ai.unitLine.Mangonel);
+  }
+  const monastery = hasIdleBuilder(ai, 'Monastery');
+  if (monastery && monastery.trainQueue.length < 1 && ai.units.filter((u) => u.stats.class === 'monk').length < 2) {
+    startTraining(ai, monastery, 'Monk');
+  }
 
   const blacksmith = hasIdleBuilder(ai, 'Blacksmith');
   if (blacksmith && ai.age >= 1) {
@@ -1535,6 +2392,16 @@ function militaryStep(state, ai, aiState) {
       }
     }
   }
+  const university = hasIdleBuilder(ai, 'University');
+  if (university && ai.age >= 2) {
+    const techOrder = ['TreadmillCrane', 'Ballistics', 'Masonry', 'SiegeEngineers'];
+    for (const key of techOrder) {
+      if (!ai.techsResearched.has(key) && ai.canAfford(TECHS[key].cost)) {
+        startResearchTech(ai, university, key);
+        break;
+      }
+    }
+  }
 
   if (barracks && ai.age >= 1 && ai.unitLine.Militia === 'Militia' && ai.canAfford(UNIT_UPGRADES.Swordsman.cost)) {
     startUnitUpgrade(ai, barracks, 'Swordsman');
@@ -1542,43 +2409,216 @@ function militaryStep(state, ai, aiState) {
   if (barracks && ai.age >= 2 && ai.unitLine.Militia === 'Swordsman' && ai.canAfford(UNIT_UPGRADES.LongSwordsman.cost)) {
     startUnitUpgrade(ai, barracks, 'LongSwordsman');
   }
+  if (barracks && ai.age >= 3 && ai.unitLine.Militia === 'LongSwordsman' && ai.canAfford(UNIT_UPGRADES.Champion.cost)) {
+    startUnitUpgrade(ai, barracks, 'Champion');
+  }
+  if (barracks && ai.age >= 3 && ai.unitLine.Spearman === 'Spearman' && ai.canAfford(UNIT_UPGRADES.Halberdier.cost)) {
+    startUnitUpgrade(ai, barracks, 'Halberdier');
+  }
   if (archery && ai.age >= 2 && ai.unitLine.Archer === 'Archer' && ai.canAfford(UNIT_UPGRADES.Crossbowman.cost)) {
     startUnitUpgrade(ai, archery, 'Crossbowman');
+  }
+  if (archery && ai.age >= 3 && ai.unitLine.Archer === 'Crossbowman' && ai.canAfford(UNIT_UPGRADES.Arbalest.cost)) {
+    startUnitUpgrade(ai, archery, 'Arbalest');
   }
   if (stable && ai.age >= 2 && ai.unitLine.Scout === 'Scout' && ai.canAfford(UNIT_UPGRADES.Knight.cost)) {
     startUnitUpgrade(ai, stable, 'Knight');
   }
+  if (stable && ai.age >= 3 && ai.unitLine.Scout === 'Knight' && ai.canAfford(UNIT_UPGRADES.Paladin.cost)) {
+    startUnitUpgrade(ai, stable, 'Paladin');
+  }
+  if (siegeWorkshop && ai.age >= 3 && ai.unitLine.Mangonel === 'Mangonel' && ai.canAfford(UNIT_UPGRADES.Trebuchet.cost)) {
+    startUnitUpgrade(ai, siegeWorkshop, 'Trebuchet');
+  }
 }
 
-function combatStep(state, ai, aiState, enemy) {
-  const idleMilitary = ai.units.filter((u) => u.stats.class !== 'villager' && (!u.task || u.task.type === 'move'));
-  if (idleMilitary.length >= aiState.attackGroupThreshold) {
-    let target = enemy.buildings.find((b) => b.type === 'TownCenter') || enemy.buildings[0];
-    let bestD = target ? dist({ x: aiState.homeX, y: aiState.homeY }, target) : Infinity;
-    for (const b of enemy.buildings) {
+// 僧侶：優先去撿最近的聖物，沒有聖物可撿時就跟著部隊移動、治療受傷友軍。
+function monkStep(state, ai, aiState) {
+  const monks = ai.units.filter((u) => u.stats.class === 'monk' && (!u.task || u.task.type === 'move'));
+  for (const monk of monks) {
+    const relic = state.map.nearestRelic(monk.x, monk.y);
+    if (relic) {
+      issueGatherRelic(state.map, monk, relic);
+      continue;
+    }
+    const wounded = ai.units.find((u) => u.stats.class !== 'monk' && u.hp < u.maxHp * 0.7 && dist(u, monk) < 10 * TILE);
+    if (wounded) issueHeal(state.map, monk, wounded);
+  }
+}
+
+// 自由對戰：從所有還活著的其他玩家中，挑離自己基地最近的目標下手。
+function combatStep(state, ai, aiState) {
+  const idleMilitary = ai.units.filter((u) => u.stats.class !== 'villager' && u.stats.class !== 'monk' && (!u.task || u.task.type === 'move'));
+  const threshold = Math.max(3, Math.round(aiState.attackGroupThreshold));
+  if (idleMilitary.length < threshold) return;
+
+  let target = null;
+  let bestD = Infinity;
+  for (const p of state.players) {
+    if (p === ai || (p.buildings.length === 0 && p.units.length === 0)) continue;
+    const tc = p.buildings.find((b) => b.type === 'TownCenter');
+    const candidates = tc ? [tc, ...p.buildings] : p.buildings;
+    for (const b of candidates) {
       const d = dist({ x: aiState.homeX, y: aiState.homeY }, b);
       if (d < bestD) {
         bestD = d;
         target = b;
       }
     }
-    if (target) {
-      for (const u of idleMilitary) issueAttack(state.map, u, target);
-      aiState.attackGroupThreshold = Math.min(16, aiState.attackGroupThreshold + 2);
-    }
+  }
+  if (target) {
+    for (const u of idleMilitary) issueAttack(state.map, u, target);
+    aiState.attackGroupThreshold = Math.min(20, aiState.attackGroupThreshold + 2 * aiState.aggressionMul);
   }
 }
 
-function updateAI(state, ai, aiState, enemy, dt) {
+function updateAI(state, ai, aiState, dt) {
   aiState.tickTimer -= dt;
   if (aiState.tickTimer > 0) return;
-  aiState.tickTimer = 2.0;
-  if (ai.defeated) return;
+  aiState.tickTimer = aiState.tickInterval;
+  if (ai.defeated || (ai.buildings.length === 0 && ai.units.length === 0)) return;
 
   economyStep(state, ai, aiState);
   militaryStep(state, ai, aiState);
-  combatStep(state, ai, aiState, enemy);
+  monkStep(state, ai, aiState);
+  combatStep(state, ai, aiState);
 }
+
+// ===== minimap.js =====
+// 小地圖：顯示已探索過的地形輪廓、各玩家單位/建築位置（受戰爭迷霧規則影響）、
+// 目前主畫面的可視範圍框，點擊小地圖可以直接跳轉視角。
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+function resizeMinimap() {
+  const rect = minimapCanvas.getBoundingClientRect();
+  minimapCanvas.width = Math.max(1, Math.round(rect.width));
+  minimapCanvas.height = Math.max(1, Math.round(rect.height));
+}
+window.addEventListener('resize', resizeMinimap);
+window.addEventListener('orientationchange', () => setTimeout(resizeMinimap, 250));
+
+function renderMinimap() {
+  if (!state) return;
+  const w = minimapCanvas.width;
+  const h = minimapCanvas.height;
+  if (w <= 1 || h <= 1) return;
+  const map = state.map;
+  const scaleX = w / (map.w * TILE);
+  const scaleY = h / (map.h * TILE);
+
+  minimapCtx.fillStyle = '#0d1a08';
+  minimapCtx.fillRect(0, 0, w, h);
+
+  minimapCtx.fillStyle = '#2c4a22';
+  const tileW = Math.max(1, Math.ceil(scaleX * TILE));
+  const tileH = Math.max(1, Math.ceil(scaleY * TILE));
+  for (let ty = 0; ty < map.h; ty++) {
+    const rowBase = ty * map.w;
+    for (let tx = 0; tx < map.w; tx++) {
+      if (map.explored[rowBase + tx]) {
+        minimapCtx.fillRect(tx * TILE * scaleX, ty * TILE * scaleY, tileW, tileH);
+      }
+    }
+  }
+
+  for (const p of state.players) {
+    minimapCtx.fillStyle = p.color.mid;
+    for (const b of p.buildings) {
+      if (!shouldRenderEntity(state, b)) continue;
+      minimapCtx.fillRect(b.x * scaleX - 2, b.y * scaleY - 2, 4, 4);
+    }
+    for (const u of p.units) {
+      if (!shouldRenderEntity(state, u)) continue;
+      minimapCtx.fillRect(u.x * scaleX - 1, u.y * scaleY - 1, 2, 2);
+    }
+  }
+
+  minimapCtx.strokeStyle = '#ffe066';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.strokeRect(camera.x * scaleX, camera.y * scaleY, viewW() * scaleX, viewH() * scaleY);
+}
+
+function jumpCameraFromMinimap(clientX, clientY) {
+  const rect = minimapCanvas.getBoundingClientRect();
+  const mx = clientX - rect.left;
+  const my = clientY - rect.top;
+  const map = state.map;
+  const wx = (mx / rect.width) * map.w * TILE;
+  const wy = (my / rect.height) * map.h * TILE;
+  camera.x = wx - viewW() / 2;
+  camera.y = wy - viewH() / 2;
+  clampCamera();
+}
+
+minimapCanvas.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!state) return;
+  const t = e.changedTouches[0];
+  jumpCameraFromMinimap(t.clientX, t.clientY);
+}, { passive: false });
+minimapCanvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  if (!state) return;
+  const t = e.changedTouches[0];
+  jumpCameraFromMinimap(t.clientX, t.clientY);
+}, { passive: false });
+
+// ===== setup.js =====
+// 開局設定畫面：選文明、電腦對手人數、難度，按下開始才會真正建立遊戲世界。
+const setupOverlay = document.getElementById('setupOverlay');
+const civGrid = document.getElementById('civGrid');
+const opponentGrid = document.getElementById('opponentGrid');
+const difficultyGrid = document.getElementById('difficultyGrid');
+const startGameBtn = document.getElementById('startGameBtn');
+
+let setupChoice = { civKey: CIV_KEYS[0], numOpponents: 1, difficulty: 'normal' };
+
+function buildSetupOption(container, title, desc, selected, onClick) {
+  const el = document.createElement('div');
+  el.className = 'setupOption' + (selected ? ' selected' : '');
+  el.innerHTML = `<div class="setupOptTitle">${title}</div>` + (desc ? `<div class="setupOptDesc">${desc}</div>` : '');
+  el.onclick = onClick;
+  container.appendChild(el);
+}
+
+function renderSetupScreen() {
+  civGrid.innerHTML = '';
+  for (const key of CIV_KEYS) {
+    const civ = CIVS[key];
+    buildSetupOption(civGrid, civ.name, civ.desc, setupChoice.civKey === key, () => {
+      setupChoice.civKey = key;
+      renderSetupScreen();
+    });
+  }
+  opponentGrid.innerHTML = '';
+  for (let n = 1; n <= 3; n++) {
+    buildSetupOption(opponentGrid, `${n} 位電腦對手`, `自由對戰，共 ${n + 1} 位玩家`, setupChoice.numOpponents === n, () => {
+      setupChoice.numOpponents = n;
+      renderSetupScreen();
+    });
+  }
+  difficultyGrid.innerHTML = '';
+  for (const key of ['easy', 'normal', 'hard']) {
+    buildSetupOption(difficultyGrid, DIFFICULTIES[key].name, null, setupChoice.difficulty === key, () => {
+      setupChoice.difficulty = key;
+      renderSetupScreen();
+    });
+  }
+}
+
+function showSetupScreen() {
+  renderSetupScreen();
+  setupOverlay.classList.remove('hidden');
+  gameOverOverlay.classList.add('hidden');
+}
+
+startGameBtn.addEventListener('click', () => {
+  setupOverlay.classList.add('hidden');
+  initGame({ civKey: setupChoice.civKey, numOpponents: setupChoice.numOpponents, difficulty: setupChoice.difficulty });
+});
 
 // ===== game.js =====
 const canvas = document.getElementById('game');
@@ -1588,15 +2628,18 @@ const topbarEls = {
   wood: document.getElementById('resWood'),
   food: document.getElementById('resFood'),
   gold: document.getElementById('resGold'),
+  relic: document.getElementById('resRelic'),
   pop: document.getElementById('resPop'),
   ageName: document.getElementById('ageName'),
   ageProgressWrap: document.getElementById('ageProgressWrap'),
   ageProgressFill: document.getElementById('ageProgressFill'),
+  wonderInfo: document.getElementById('wonderInfo'),
 };
 const selectionInfoEl = document.getElementById('selectionInfo');
 const actionButtonsEl = document.getElementById('actionButtons');
 const gameOverOverlay = document.getElementById('gameOverOverlay');
 const gameOverText = document.getElementById('gameOverText');
+const gameOverStats = document.getElementById('gameOverStats');
 const restartBtn = document.getElementById('restartBtn');
 const placementCancelBtn = document.getElementById('placementCancelBtn');
 const bottompanelEl = document.getElementById('bottompanel');
@@ -1604,12 +2647,17 @@ const bottompanelEl = document.getElementById('bottompanel');
 const BUILD_ICON = {
   TownCenter: '🏛️', House: '🏠', Barracks: '⚔️', ArcheryRange: '🏹', Stable: '🐎',
   Blacksmith: '🔨', Farm: '🌾', LumberCamp: '🪓', MiningCamp: '⛏️',
+  Market: '🏪', University: '🎓', Monastery: '⛪', SiegeWorkshop: '🏭',
+  Wonder: '🗿', Wall: '🧱', Gate: '🚪', WatchTower: '🗼',
 };
 const UNIT_ICON = {
-  Villager: '🧑‍🌾', Militia: '🗡️', Swordsman: '🗡️', LongSwordsman: '🗡️',
-  Spearman: '🔱', Archer: '🏹', Crossbowman: '🏹', Scout: '🐴', Knight: '🐴',
+  Villager: '🧑‍🌾', Militia: '🗡️', Swordsman: '🗡️', LongSwordsman: '🗡️', Champion: '🗡️',
+  Spearman: '🔱', Halberdier: '🔱', Archer: '🏹', Crossbowman: '🏹', Arbalest: '🏹',
+  Scout: '🐴', Knight: '🐴', Paladin: '🐴', Monk: '🙏',
+  BatteringRam: '🪵', Mangonel: '💥', Trebuchet: '🎯',
 };
-let state, human, ai, aiState, camera, selection, placement, uiTimer;
+let state, human, aiPlayers, aiStates, camera, selection, placement, uiTimer;
+let gameSetup = { civKey: CIV_KEYS[0], numOpponents: 1, difficulty: 'normal' };
 let dragStart = null;
 let dragCurrent = null;
 let pointerWorld = { x: 0, y: 0 };
@@ -1658,26 +2706,36 @@ function placeStartingBuilding(player, type, x, y) {
   return b;
 }
 
-function initGame() {
-  const gen = generateMap();
-  human = new Player(0, '玩家', false);
-  ai = new Player(1, '電腦', true);
-  state = { map: gen.map, players: [human, ai], projectiles: [], time: 0, ended: false, winner: null };
+function initGame(setup) {
+  gameSetup = setup || gameSetup;
+  const numPlayers = 1 + gameSetup.numOpponents;
+  const gen = generateMap(numPlayers);
 
-  placeStartingBuilding(human, 'TownCenter', gen.playerStart.x, gen.playerStart.y);
-  placeStartingBuilding(ai, 'TownCenter', gen.aiStart.x, gen.aiStart.y);
-
-  for (let i = 0; i < 3; i++) {
-    const ang = (i / 3) * Math.PI * 2;
-    human.units.push(createUnit(human, 'Villager', gen.playerStart.x + Math.cos(ang) * 60, gen.playerStart.y + Math.sin(ang) * 60));
-    ai.units.push(createUnit(ai, 'Villager', gen.aiStart.x + Math.cos(ang) * 60, gen.aiStart.y + Math.sin(ang) * 60));
+  human = new Player(0, '玩家', false, gameSetup.civKey, null);
+  const otherCivs = CIV_KEYS.filter((k) => k !== gameSetup.civKey);
+  aiPlayers = [];
+  for (let i = 1; i < numPlayers; i++) {
+    const civKey = otherCivs.length > 0 ? otherCivs[(i - 1) % otherCivs.length] : CIV_KEYS[i % CIV_KEYS.length];
+    aiPlayers.push(new Player(i, `電腦 ${i}`, true, civKey, gameSetup.difficulty));
   }
-  recalcPopCap(human);
-  recalcPopCap(ai);
+  const allPlayers = [human, ...aiPlayers];
+  state = { map: gen.map, players: allPlayers, projectiles: [], time: 0, ended: false, winner: null, winReason: null };
 
-  aiState = createAIState(gen.aiStart.x, gen.aiStart.y);
+  aiStates = [];
+  for (let i = 0; i < allPlayers.length; i++) {
+    const p = allPlayers[i];
+    const start = gen.starts[i];
+    placeStartingBuilding(p, 'TownCenter', start.x, start.y);
+    const villagerCount = STARTING_VILLAGERS + (p.extraVillagers || 0);
+    for (let k = 0; k < villagerCount; k++) {
+      const ang = (k / villagerCount) * Math.PI * 2;
+      p.units.push(createUnit(p, 'Villager', start.x + Math.cos(ang) * 60, start.y + Math.sin(ang) * 60));
+    }
+    recalcPopCap(p);
+    if (p.isAI) aiStates.push(createAIState(start.x, start.y, gameSetup.difficulty));
+  }
 
-  camera = { x: gen.playerStart.x - viewW() / 2, y: gen.playerStart.y - viewH() / 2 };
+  camera = { x: gen.starts[0].x - viewW() / 2, y: gen.starts[0].y - viewH() / 2 };
   clampCamera();
   selection = [];
   placement = null;
@@ -1702,6 +2760,7 @@ function pickEntity(wx, wy) {
   let bestUD = Infinity;
   for (const p of state.players) {
     for (const u of p.units) {
+      if (!shouldRenderEntity(state, u)) continue;
       const d = Math.hypot(u.x - wx, u.y - wy);
       if (d <= u.radius + 4 && d < bestUD) {
         bestUD = d;
@@ -1712,6 +2771,7 @@ function pickEntity(wx, wy) {
   if (bestUnit) return { kind: 'unit', ref: bestUnit };
   for (const p of state.players) {
     for (const b of p.buildings) {
+      if (!shouldRenderEntity(state, b)) continue;
       const r = buildingRadius(b);
       if (Math.abs(b.x - wx) <= r && Math.abs(b.y - wy) <= r) return { kind: 'building', ref: b };
     }
@@ -1719,6 +2779,10 @@ function pickEntity(wx, wy) {
   for (const r of state.map.resources) {
     const d = Math.hypot(r.x - wx, r.y - wy);
     if (d <= r.radius + 8) return { kind: 'resource', ref: r };
+  }
+  for (const relic of state.map.relics) {
+    const d = Math.hypot(relic.x - wx, relic.y - wy);
+    if (d <= relic.radius + 8) return { kind: 'relic', ref: relic };
   }
   return null;
 }
@@ -1764,24 +2828,32 @@ function commandAtPoint(wx, wy) {
     if (myBuilding) myBuilding.rally = { x: wx, y: wy };
     return;
   }
+  const monks = myUnits.filter((u) => u.stats.class === 'monk');
+  const villagers = myUnits.filter((u) => u.stats.class === 'villager');
+  const combatUnits = myUnits.filter((u) => u.stats.class !== 'monk' && u.stats.class !== 'villager');
   const pick = pickEntity(wx, wy);
+
   if (pick && pick.kind === 'unit' && pick.ref.owner !== human) {
-    for (const u of myUnits) issueAttack(state.map, u, pick.ref);
+    for (const u of combatUnits) issueAttack(state.map, u, pick.ref);
+    for (const u of villagers) issueAttack(state.map, u, pick.ref);
+    for (const u of monks) issueConvert(state.map, u, pick.ref);
   } else if (pick && pick.kind === 'building' && pick.ref.owner !== human) {
-    for (const u of myUnits) issueAttack(state.map, u, pick.ref);
+    for (const u of combatUnits) issueAttack(state.map, u, pick.ref);
+    for (const u of villagers) issueAttack(state.map, u, pick.ref);
+    for (const u of monks) issueMove(state.map, u, pick.ref.x, pick.ref.y);
+  } else if (pick && pick.kind === 'unit' && pick.ref.owner === human && pick.ref.hp < pick.ref.maxHp && monks.length > 0) {
+    for (const u of monks) issueHeal(state.map, u, pick.ref);
+    for (const u of [...combatUnits, ...villagers]) issueMove(state.map, u, wx, wy);
+  } else if (pick && pick.kind === 'relic') {
+    for (const u of monks) issueGatherRelic(state.map, u, pick.ref);
+    for (const u of [...combatUnits, ...villagers]) issueMove(state.map, u, wx, wy);
   } else if (pick && pick.kind === 'resource') {
-    for (const u of myUnits) {
-      if (u.stats.class === 'villager') issueGather(state.map, u, pick.ref);
-      else issueMove(state.map, u, pick.ref.x, pick.ref.y);
-    }
+    for (const u of villagers) issueGather(state.map, u, pick.ref);
+    for (const u of [...combatUnits, ...monks]) issueMove(state.map, u, pick.ref.x, pick.ref.y);
   } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.def.isFarm && pick.ref.foodLeft > 0) {
-    for (const u of myUnits) {
-      if (u.stats.class === 'villager') issueGatherFarm(state.map, u, pick.ref);
-    }
+    for (const u of villagers) issueGatherFarm(state.map, u, pick.ref);
   } else if (pick && pick.kind === 'building' && pick.ref.owner === human && pick.ref.constructing) {
-    for (const u of myUnits) {
-      if (u.stats.class === 'villager') issueBuild(state.map, u, pick.ref);
-    }
+    for (const u of villagers) issueBuild(state.map, u, pick.ref);
   } else {
     let i = 0;
     const n = myUnits.length;
@@ -1855,7 +2927,7 @@ function armLongPressTimer() {
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
-  if (state.ended) return;
+  if (!state || state.ended) return;
   for (const t of e.changedTouches) activeTouches.set(t.identifier, { x: t.clientX, y: t.clientY });
 
   if (activeTouches.size >= 2) {
@@ -1988,6 +3060,22 @@ function tryPlaceBuilding(wx, wy) {
   refreshUI();
 }
 
+function checkVictory(state) {
+  if (state.ended) return;
+  if (human.buildings.length === 0 && human.units.length === 0) {
+    state.ended = true;
+    state.winner = null;
+    state.winReason = 'defeat';
+    return;
+  }
+  const alive = state.players.filter((p) => p.buildings.length > 0 || p.units.length > 0);
+  if (alive.length <= 1) {
+    state.ended = true;
+    state.winner = alive[0] || null;
+    state.winReason = 'conquest';
+  }
+}
+
 function update(dt) {
   state.time += dt;
   for (const p of state.players) {
@@ -1996,18 +3084,18 @@ function update(dt) {
     const buildingsCopy = p.buildings.slice();
     for (const b of buildingsCopy) updateBuilding(state, p, b, dt);
     updatePlayerAge(p, dt);
+    updateRelicIncome(p, dt);
+    updateWonderCountdown(state, p, dt);
     recalcPopCap(p);
   }
   updateProjectiles(state, dt);
-  updateAI(state, ai, aiState, human, dt);
+  updateFogOfWar(state);
+  for (let i = 0; i < aiPlayers.length; i++) updateAI(state, aiPlayers[i], aiStates[i], dt);
 
   selection = selection.filter((e) => (e.kind === 'unit' ? e.owner.units.includes(e) : e.owner.buildings.includes(e)));
 
   if (!state.ended) {
-    const humanAlive = human.buildings.length > 0 || human.units.length > 0;
-    const aiAlive = ai.buildings.length > 0 || ai.units.length > 0;
-    if (!humanAlive) { state.ended = true; state.winner = ai; }
-    else if (!aiAlive) { state.ended = true; state.winner = human; }
+    checkVictory(state);
     if (state.ended) showGameOver();
   }
 
@@ -2019,10 +3107,22 @@ function update(dt) {
 }
 
 function showGameOver() {
-  gameOverText.textContent = state.winner === human ? '勝利！你征服了對手' : '戰敗……基地已被摧毀';
+  const won = state.winner === human;
+  const reasonText = { conquest: '征服了所有對手', wonder: '完成了奇觀勝利', defeat: '' }[state.winReason] || '';
+  if (won) {
+    gameOverText.textContent = `勝利！${reasonText}`;
+  } else if (state.winReason === 'wonder' && state.winner) {
+    gameOverText.textContent = `戰敗……${state.winner.name} 完成了奇觀勝利`;
+  } else {
+    gameOverText.textContent = '戰敗……基地已被摧毀';
+  }
+  gameOverStats.innerHTML = `
+    <div>擊殺數：${human.stats.kills}　損失單位：${human.stats.unitsLost}</div>
+    <div>最終時代：${ageLabel(human.age)}　收集聖物：${human.relics}</div>
+  `;
   gameOverOverlay.classList.remove('hidden');
 }
-restartBtn.addEventListener('click', () => { initGame(); });
+restartBtn.addEventListener('click', () => { showSetupScreen(); });
 placementCancelBtn.addEventListener('click', () => { placement = null; refreshUI(); });
 
 // ---- 地形材質：預先畫好一張可平鋪的草地紋理，避免每幀重畫雜訊 ----
@@ -2150,10 +3250,36 @@ function drawResourceNode(r) {
   ctx.globalAlpha = 1;
 }
 
+function drawRelic(relic) {
+  if (relic.carriedBy) return;
+  const sx = relic.x - camera.x;
+  const sy = relic.y - camera.y;
+  if (sx < -30 || sy < -30 || sx > viewW() + 30 || sy > viewH() + 30) return;
+  drawShadow(sx, sy + 9, 11, 4);
+  const pulse = 2 + Math.sin(state.time * 2.4 + relic.x) * 1.5;
+  ctx.fillStyle = 'rgba(220,180,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(sx, sy, 13 + pulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#d8a8ff';
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - 10);
+  ctx.lineTo(sx + 8, sy);
+  ctx.lineTo(sx, sy + 10);
+  ctx.lineTo(sx - 8, sy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#7a3fae';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('💎', sx, sy);
+}
+
 function ownerPalette(owner) {
-  return owner.id === 0
-    ? { light: '#5b9bf5', mid: '#3b82f6', dark: '#1d4ed8', darkest: '#123a8a' }
-    : { light: '#f5726b', mid: '#ef4444', dark: '#b91c1c', darkest: '#7a1010' };
+  return owner.color;
 }
 
 function ownerColor(owner, alt) {
@@ -2254,6 +3380,106 @@ function drawBuildingDetail(b, sx, sy, half, pal) {
         ctx.arc(sx + half * 0.44, sy - half * 1.4, half * 0.18, 0, Math.PI * 2);
         ctx.fill();
       }
+      break;
+    }
+    case 'Market': {
+      ctx.fillStyle = '#c99a3a';
+      ctx.beginPath();
+      ctx.moveTo(sx - half * 0.85, sy - half * 0.05);
+      ctx.lineTo(sx - half * 0.5, sy - half * 0.9);
+      ctx.lineTo(sx + half * 0.5, sy - half * 0.9);
+      ctx.lineTo(sx + half * 0.85, sy - half * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#7a5a20';
+      for (let i = -1; i <= 1; i++) {
+        ctx.fillRect(sx + i * half * 0.5 - 2, sy - half * 0.15, 4, half * 0.5);
+      }
+      break;
+    }
+    case 'University': {
+      ctx.fillStyle = '#8a8a95';
+      roundRectPath(sx - half * 0.7, sy - half * 0.9, half * 1.4, half * 0.9, 3);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#c7cbe0';
+      ctx.beginPath();
+      ctx.arc(sx, sy - half * 0.95, half * 0.32, Math.PI, 0);
+      ctx.fill();
+      break;
+    }
+    case 'Monastery': {
+      ctx.fillStyle = '#d8d0b8';
+      roundRectPath(sx - half * 0.55, sy - half * 1.1, half * 1.1, half * 1.1, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#c94f3f';
+      ctx.fillRect(sx - half * 0.08, sy - half * 1.35, half * 0.16, half * 0.35);
+      ctx.fillRect(sx - half * 0.2, sy - half * 1.22, half * 0.4, half * 0.12);
+      break;
+    }
+    case 'SiegeWorkshop': {
+      ctx.fillStyle = '#5a4a30';
+      ctx.fillRect(sx - half * 0.8, sy - half * 0.5, half * 1.6, half * 0.5);
+      ctx.strokeStyle = '#2a2010';
+      ctx.lineWidth = 2;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(sx + i * half * 0.32, sy - half * 0.5);
+        ctx.lineTo(sx + i * half * 0.32, sy);
+        ctx.stroke();
+      }
+      break;
+    }
+    case 'Wonder': {
+      ctx.fillStyle = '#e8e0c8';
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillRect(sx + i * half * 0.42 - half * 0.09, sy - half * 1.3, half * 0.18, half * 1.3);
+      }
+      ctx.fillStyle = '#d4c088';
+      ctx.fillRect(sx - half * 1.05, sy - half * 1.3, half * 2.1, half * 0.16);
+      ctx.strokeStyle = 'rgba(255,224,150,0.6)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      break;
+    }
+    case 'Wall': {
+      ctx.fillStyle = '#9a9a90';
+      ctx.fillRect(sx - half, sy - half * 0.9, half * 2, half * 1.8);
+      ctx.fillStyle = '#7a7a70';
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillRect(sx + i * half * 0.4 - 3, sy - half * 1.05, 6, half * 0.25);
+      }
+      break;
+    }
+    case 'Gate': {
+      ctx.fillStyle = b.open ? 'rgba(120,110,90,0.35)' : '#7a6a4a';
+      ctx.fillRect(sx - half, sy - half * 0.9, half * 2, half * 1.8);
+      if (!b.open) {
+        ctx.strokeStyle = '#4a3f28';
+        ctx.lineWidth = 1.5;
+        for (let i = -1; i <= 1; i++) {
+          ctx.beginPath();
+          ctx.moveTo(sx + i * half * 0.6, sy - half * 0.85);
+          ctx.lineTo(sx + i * half * 0.6, sy + half * 0.85);
+          ctx.stroke();
+        }
+      }
+      break;
+    }
+    case 'WatchTower': {
+      ctx.fillStyle = '#8a8578';
+      ctx.beginPath();
+      ctx.moveTo(sx - half * 0.4, sy + half * 0.4);
+      ctx.lineTo(sx - half * 0.5, sy - half * 0.9);
+      ctx.lineTo(sx + half * 0.5, sy - half * 0.9);
+      ctx.lineTo(sx + half * 0.4, sy + half * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#6a655a';
+      ctx.fillRect(sx - half * 0.6, sy - half * 1.15, half * 1.2, half * 0.25);
       break;
     }
     default: {
@@ -2484,18 +3710,45 @@ function render() {
 
   const drawList = [];
   for (const r of state.map.resources) drawList.push({ y: r.y, draw: () => drawResourceNode(r) });
+  for (const rl of state.map.relics) drawList.push({ y: rl.y, draw: () => drawRelic(rl) });
   for (const p of state.players) {
-    for (const b of p.buildings) drawList.push({ y: b.y + (b.sizeTiles * TILE) / 2, draw: () => drawBuilding(b) });
-    for (const u of p.units) drawList.push({ y: u.y, draw: () => drawUnit(u) });
+    for (const b of p.buildings) {
+      if (!shouldRenderEntity(state, b)) continue;
+      drawList.push({ y: b.y + (b.sizeTiles * TILE) / 2, draw: () => drawBuilding(b) });
+    }
+    for (const u of p.units) {
+      if (!shouldRenderEntity(state, u)) continue;
+      drawList.push({ y: u.y, draw: () => drawUnit(u) });
+    }
   }
   drawList.sort((a, b) => a.y - b.y);
   for (const item of drawList) item.draw();
 
   for (const pr of state.projectiles) drawProjectile(pr);
   drawPlacementGhost();
+  drawFogOfWar();
   ctx.restore();
 
   drawSelectionBox();
+}
+
+function drawFogOfWar() {
+  const map = state.map;
+  const startTx = Math.max(0, Math.floor(camera.x / TILE));
+  const startTy = Math.max(0, Math.floor(camera.y / TILE));
+  const endTx = Math.min(map.w, Math.ceil((camera.x + viewW()) / TILE) + 1);
+  const endTy = Math.min(map.h, Math.ceil((camera.y + viewH()) / TILE) + 1);
+  for (let ty = startTy; ty < endTy; ty++) {
+    const rowBase = ty * map.w;
+    for (let tx = startTx; tx < endTx; tx++) {
+      const idx = rowBase + tx;
+      const explored = map.explored[idx];
+      const visible = map.visibleNow[idx];
+      if (visible) continue;
+      ctx.fillStyle = explored ? 'rgba(6,10,4,0.55)' : 'rgba(4,7,3,0.96)';
+      ctx.fillRect(tx * TILE - camera.x, ty * TILE - camera.y, TILE + 1, TILE + 1);
+    }
+  }
 }
 
 function ageLabel(ageId) {
@@ -2507,8 +3760,13 @@ function buildBuildingButtons(container) {
   label.className = 'sectionLabel';
   label.textContent = '建造建築物';
   container.appendChild(label);
-  const options = ['House', 'Barracks', 'Farm'];
-  if (human.age >= 1) options.push('ArcheryRange', 'Stable', 'Blacksmith', 'LumberCamp', 'MiningCamp');
+  const options = Object.keys(BUILDINGS).filter((type) => {
+    if (type === 'TownCenter') return false;
+    const def = BUILDINGS[type];
+    const req = def.requiresAge || 0;
+    if (def.isWonder && human.age < 3) return false;
+    return req <= human.age;
+  });
   for (const type of options) {
     const def = BUILDINGS[type];
     const btn = document.createElement('div');
@@ -2587,10 +3845,69 @@ function buildAgeUpButton(container, building) {
   container.appendChild(btn);
 }
 
+function buildTradeButtons(container) {
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = `市場交易（每次 ${MARKET_TRADE_AMOUNT}）`;
+  container.appendChild(label);
+  const rows = [
+    { type: 'wood', name: '木材', icon: '🌲' },
+    { type: 'food', name: '食物', icon: '🌾' },
+  ];
+  for (const r of rows) {
+    const sellBtn = document.createElement('div');
+    const canSell = (human.resources[r.type] || 0) >= MARKET_TRADE_AMOUNT;
+    sellBtn.className = 'actBtn' + (canSell ? '' : ' disabled');
+    sellBtn.innerHTML = `<div class="icon">${r.icon}➡️🪙</div><div>賣出${r.name}</div><div class="cost">換 ${Math.round(MARKET_TRADE_AMOUNT * marketSellRate(human))} 金</div>`;
+    sellBtn.onclick = () => { sellResource(human, r.type); refreshUI(); };
+    container.appendChild(sellBtn);
+
+    const buyBtn = document.createElement('div');
+    const buyCost = MARKET_TRADE_AMOUNT * marketBuyRate(human);
+    const canBuy = (human.resources.gold || 0) >= buyCost;
+    buyBtn.className = 'actBtn' + (canBuy ? '' : ' disabled');
+    buyBtn.innerHTML = `<div class="icon">🪙➡️${r.icon}</div><div>買入${r.name}</div><div class="cost">花 ${Math.round(buyCost)} 金</div>`;
+    buyBtn.onclick = () => { buyResource(human, r.type); refreshUI(); };
+    container.appendChild(buyBtn);
+  }
+}
+
+function buildGateToggleButton(container, building) {
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = '城門控制';
+  container.appendChild(label);
+  const btn = document.createElement('div');
+  btn.className = 'actBtn';
+  btn.innerHTML = `<div class="icon">${building.open ? '🔓' : '🔒'}</div><div>${building.open ? '關閉城門' : '開啟城門'}</div>`;
+  btn.onclick = () => { toggleGate(state.map, building); refreshUI(); };
+  container.appendChild(btn);
+}
+
+function buildStanceButtons(container, units) {
+  const label = document.createElement('div');
+  label.className = 'sectionLabel';
+  label.textContent = '駐守模式';
+  container.appendChild(label);
+  const modes = [
+    { key: 'aggressive', name: '主動迎戰', icon: '⚔️' },
+    { key: 'stand', name: '原地駐守', icon: '🛡️' },
+  ];
+  for (const m of modes) {
+    const btn = document.createElement('div');
+    const isSelected = units.every((u) => u.stance === m.key);
+    btn.className = 'actBtn' + (isSelected ? ' selectedStance' : '');
+    btn.innerHTML = `<div class="icon">${m.icon}</div><div>${m.name}</div>`;
+    btn.onclick = () => { for (const u of units) u.stance = m.key; refreshUI(); };
+    container.appendChild(btn);
+  }
+}
+
 function refreshActionButtons() {
   actionButtonsEl.innerHTML = '';
   const myBuildings = selection.filter((e) => e.kind === 'building' && e.owner === human);
   const myVillagers = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
+  const myCombatUnits = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class !== 'villager' && e.stats.class !== 'monk');
 
   if (myBuildings.length === 1) {
     const b = myBuildings[0];
@@ -2630,11 +3947,17 @@ function refreshActionButtons() {
         for (const key of b.def.researches) techButton(actionButtonsEl, b, key);
       }
       if (b.def.canAgeUp) buildAgeUpButton(actionButtonsEl, b);
+      if (b.type === 'Market') buildTradeButtons(actionButtonsEl);
+      if (b.def.isGate) buildGateToggleButton(actionButtonsEl, b);
     }
   }
 
   if (myVillagers.length > 0 && myBuildings.length === 0) {
     buildBuildingButtons(actionButtonsEl);
+  }
+
+  if (myCombatUnits.length > 0 && myBuildings.length === 0) {
+    buildStanceButtons(actionButtonsEl, myCombatUnits);
   }
 
   if (myBuildings.length === 0 && myVillagers.length === 0 && selection.length === 0) {
@@ -2674,6 +3997,13 @@ function refreshSelectionInfo() {
         extra += `<div>研究中：${rname}（剩 ${e.research.timeLeft.toFixed(1)}s）</div>`;
       }
       if (e.def.isFarm) extra += `<div>剩餘食物：${Math.ceil(e.foodLeft || 0)}</div>`;
+      if (e.def.relicDropOff) extra += `<div>存放聖物：${e.relicsHeld || 0} 個</div>`;
+      if (e.def.isGate) extra += `<div>城門狀態：${e.open ? '開啟' : '關閉'}</div>`;
+      if (e.def.isWonder) {
+        extra += e.owner.wonderCountdown && e.owner.wonderBuilding === e
+          ? `<div>奇觀勝利倒數：${Math.ceil(e.owner.wonderCountdown.timeLeft)}s</div>`
+          : '<div>奇觀已建成，倒數即將開始</div>';
+      }
       selectionInfoEl.innerHTML = `
         <div class="name">${BUILD_ICON[e.type] || ''} ${e.def.name}${e.owner.isAI ? '（敵方）' : ''}</div>
         <div class="hpbar"><div class="fill" style="width:${(e.hp / e.maxHp) * 100}%"></div></div>
@@ -2699,6 +4029,7 @@ function refreshTopbar() {
   topbarEls.wood.textContent = Math.floor(human.resources.wood);
   topbarEls.food.textContent = Math.floor(human.resources.food);
   topbarEls.gold.textContent = Math.floor(human.resources.gold);
+  topbarEls.relic.textContent = human.relics;
   topbarEls.pop.textContent = `${human.currentPop()}/${human.popCap}`;
   topbarEls.ageName.textContent = ageLabel(human.age);
   if (human.ageResearch) {
@@ -2707,6 +4038,12 @@ function refreshTopbar() {
     topbarEls.ageProgressFill.style.width = `${ratio * 100}%`;
   } else {
     topbarEls.ageProgressWrap.classList.add('hidden');
+  }
+  if (human.wonderCountdown) {
+    topbarEls.wonderInfo.classList.remove('hidden');
+    topbarEls.wonderInfo.textContent = `🗿 奇觀倒數 ${Math.ceil(human.wonderCountdown.timeLeft)}s`;
+  } else {
+    topbarEls.wonderInfo.classList.add('hidden');
   }
 }
 
@@ -2724,17 +4061,18 @@ function frame(ts) {
   let dt = (ts - lastTs) / 1000;
   lastTs = ts;
   dt = Math.min(dt, 0.05);
-  if (!state.ended) {
-    update(dt);
+  if (state) {
+    if (!state.ended) update(dt);
+    render();
+    renderMinimap();
   }
-  render();
   requestAnimationFrame(frame);
 }
 
 resizeCanvas();
-initGame();
+resizeMinimap();
+showSetupScreen();
 requestAnimationFrame(frame);
-
-  </script>
+</script>
 </body>
 </html>

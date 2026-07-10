@@ -157,6 +157,15 @@ html, body {
 .actBtn .icon { font-size: clamp(16px, 3vh, 20px); }
 .actBtn .cost { font-size: 0.85em; color: var(--parchment-dim); }
 .actBtn.disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
+/* 點了灰掉的按鈕時的「不行喔」抖動提示，讓玩家知道點擊有反應，只是條件還不夠 */
+@keyframes actBtnDenied {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.actBtn.denied { animation: actBtnDenied 0.28s ease; border-color: #e53935 !important; }
 .actBtn .queueBadge {
   position: absolute; top: -4px; right: -4px; background: var(--gold); color: #241a10;
   font-size: 10px; font-weight: bold; border-radius: 9px; padding: 1px 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
@@ -164,6 +173,7 @@ html, body {
 .actBtn .miniProgress { position: absolute; bottom: 0; left: 0; height: 4px; background: linear-gradient(90deg,#4a8a3a,#7cc36b); border-radius: 0 0 6px 6px; }
 .actBtn.selectedStance { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold), 0 0 8px rgba(232,193,74,0.4); }
 .sectionLabel { width: 100%; font-size: 11px; color: #a9967a; margin: 2px 0 -2px 0; text-transform: uppercase; letter-spacing: 0.05em; }
+.sectionLabel.popWarn { color: #ffb347; text-transform: none; font-size: 12px; margin-bottom: 4px; }
 
 #placementCancelBtn {
   position: fixed; z-index: 25; display: none;
@@ -1302,7 +1312,7 @@ function createBuilding(owner, type, x, y, opts = {}) {
   if (def.isGate) building.open = false;
   if (def.isWonder) building.wonderActive = false;
   if (def.relicDropOff) building.relicsHeld = 0;
-  if (def.isFarm) building.worker = null;
+  if (def.isFarm) { building.worker = null; building.workerArrived = false; }
   return building;
 }
 
@@ -1657,7 +1667,7 @@ function updateFarmWorkTask(state, unit, dt) {
   const task = unit.task;
   const farm = task.farm;
   if (!farm || farm.hp <= 0 || farm.foodLeft <= 0 || farm.owner !== unit.owner) {
-    if (farm && farm.worker === unit) farm.worker = null;
+    if (farm && farm.worker === unit) { farm.worker = null; farm.workerArrived = false; }
     unit.task = null;
     return;
   }
@@ -1666,9 +1676,11 @@ function updateFarmWorkTask(state, unit, dt) {
   if (!arrived) return;
   const d = buildingProximity(unit, farm);
   if (d > buildingRadius(farm) + unit.radius + 6) {
+    farm.workerArrived = false;
     pathToBuilding(state.map, unit, farm);
     return;
   }
+  farm.workerArrived = true;
   const stats = effectiveStats(unit);
   const gatherMul = unit.owner.gatherMul.food || 1;
   const take = Math.min(stats.gatherRate * gatherMul * dt, farm.foodLeft);
@@ -1676,6 +1688,7 @@ function updateFarmWorkTask(state, unit, dt) {
   unit.owner.resources.food += take;
   if (farm.foodLeft <= 0) {
     farm.worker = null;
+    farm.workerArrived = false;
     unit.task = null;
     removeEntity(state, farm);
   }
@@ -1756,6 +1769,7 @@ function updateBuilding(state, player, building, dt) {
     const w = building.worker;
     if (!w.task || w.task.type !== 'farmWork' || w.task.farm !== building || w.hp <= 0 || w.owner.units.indexOf(w) < 0) {
       building.worker = null;
+      building.workerArrived = false;
     }
   }
   if (building.def.attack) updateDefenseBuildingAttack(state, building, dt);
@@ -2630,17 +2644,34 @@ let pointerWorld = { x: 0, y: 0 };
 // 部分手機瀏覽器/WebView 由原始 touchstart+touchend 合成 click 事件的時機不穩定，
 // 曾經造成「按了開始遊戲/建造按鈕卻完全沒反應，畫面卡住」的回報。
 // 直接在 touchend 處理並 preventDefault，同時保留 click 作為備援（用旗標避免兩邊都觸發）。
+// 「看起來灰掉的按鈕」（.disabled）在這個 UI 裡其實只是換個樣式，並沒有真的
+// pointer-events:none，點下去 handler 內部檢查資源/人口不足還是會靜靜地什麼也不做——
+// 玩家會以為按鈕壞掉了。統一在這裡攔截：灰掉的按鈕點下去先做一個「抖動」提示，
+// 不呼叫實際 handler，讓玩家清楚知道「有反應，但目前不能這麼做」。
+function fireDenied(el) {
+  el.classList.remove('denied');
+  void el.offsetWidth;
+  el.classList.add('denied');
+}
+
 function onTap(el, handler) {
   let handledAt = 0;
+  const dispatch = (e) => {
+    if (el.classList.contains('disabled')) {
+      fireDenied(el);
+      return;
+    }
+    handler(e);
+  };
   el.addEventListener('touchend', (e) => {
     e.preventDefault();
     e.stopPropagation();
     handledAt = Date.now();
-    handler(e);
+    dispatch(e);
   }, { passive: false });
   el.addEventListener('click', (e) => {
     if (Date.now() - handledAt < 500) return;
-    handler(e);
+    dispatch(e);
   });
 }
 
@@ -2759,13 +2790,23 @@ function pickEntity(wx, wy) {
   }
   if (bestUnit) return { kind: 'unit', ref: bestUnit };
   const buildingPad = tapToleranceWorld(6);
+  let bestBuilding = null;
+  let bestBD = Infinity;
   for (const p of state.players) {
     for (const b of p.buildings) {
       if (!shouldRenderEntity(state, b)) continue;
       const r = buildingRadius(b) + buildingPad;
-      if (Math.abs(b.x - wx) <= r && Math.abs(b.y - wy) <= r) return { kind: 'building', ref: b };
+      if (Math.abs(b.x - wx) > r || Math.abs(b.y - wy) > r) continue;
+      // 挑「最近的」符合建築，而不是陣列裡第一個符合的——建築物擺得密集時，
+      // 容錯範圍常常會重疊，選第一個符合的常常選錯隔壁的建築。
+      const d = Math.hypot(b.x - wx, b.y - wy);
+      if (d < bestBD) {
+        bestBD = d;
+        bestBuilding = b;
+      }
     }
   }
+  if (bestBuilding) return { kind: 'building', ref: bestBuilding };
   const resourcePad = tapToleranceWorld(10);
   for (const r of state.map.resources) {
     const d = Math.hypot(r.x - wx, r.y - wy);
@@ -3067,7 +3108,10 @@ function tryPlaceBuilding(wx, wy) {
   if (!human.canAfford(def.cost)) return;
   const b = startBuildingConstruction(state, human, placement.type, c.x, c.y);
   if (!b) return;
-  placement = null;
+  // 城牆/城門通常要一段一段連續放置好幾格，放完一格就跳出建造模式的話，
+  // 每一格都要重新開一次建造選單，非常不順手——這兩種維持建造模式，
+  // 讓玩家可以直接一路點著放下去，直到手動按「取消建造」或資源不夠為止。
+  if (!def.isWall && !def.isGate) placement = null;
   refreshUI();
 }
 
@@ -3674,6 +3718,35 @@ function drawPlacementGhost() {
   ctx.fillText(BUILD_ICON[placement.type] || '?', sx, sy);
 }
 
+// 選取訓練建築時，若設過集結點就在地圖上畫一支小旗子——不畫的話，玩家點地圖
+// 設定集結點之後完全不知道剛剛設到哪裡去了，感覺像沒反應。
+function drawRallyMarkers() {
+  for (const e of selection) {
+    if (e.kind !== 'building' || e.owner !== human || !e.rally) continue;
+    const sx = e.rally.x - camera.x;
+    const sy = e.rally.y - camera.y;
+    if (sx < -20 || sy < -20 || sx > viewW() + 20 || sy > viewH() + 20) continue;
+    ctx.strokeStyle = '#ffe066';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + 14);
+    ctx.lineTo(sx, sy - 14);
+    ctx.stroke();
+    ctx.fillStyle = '#ffe066';
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 14);
+    ctx.lineTo(sx + 12, sy - 9);
+    ctx.lineTo(sx, sy - 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + 15, 6, 2.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 function drawSelectionBox() {
   if (!dragStart || !dragCurrent) return;
   const dx = Math.abs(dragCurrent.x - dragStart.x);
@@ -3742,6 +3815,7 @@ function render() {
   for (const item of drawList) item.draw();
 
   for (const pr of state.projectiles) drawProjectile(pr);
+  drawRallyMarkers();
   drawPlacementGhost();
   drawFogOfWar();
   ctx.restore();
@@ -3911,12 +3985,17 @@ function buildFarmWorkerButton(container, farm) {
   const btn = document.createElement('div');
   if (farm.worker) {
     btn.className = 'actBtn disabled';
-    btn.innerHTML = '<div class="icon">🧑‍🌾</div><div>已有村民耕作中</div>';
+    btn.innerHTML = farm.workerArrived
+      ? '<div class="icon">🧑‍🌾</div><div>已有村民耕作中</div>'
+      : '<div class="icon">🚶</div><div>村民正前往農田</div>';
     container.appendChild(btn);
     return;
   }
   const myVillagers = selection.filter((e) => e.kind === 'unit' && e.owner === human && e.stats.class === 'villager');
-  const candidate = myVillagers[0] || human.units.find((u) => u.stats.class === 'villager');
+  // 沒有先選村民時，優先挑「真正閒著」的村民頂上去，不要誤徵用正在採集/建造中
+  // 的村民，不然玩家會發現自己某個資源點的村民莫名其妙不見了。
+  const idleVillager = human.units.find((u) => u.stats.class === 'villager' && !u.task);
+  const candidate = myVillagers[0] || idleVillager;
   btn.className = 'actBtn' + (candidate ? '' : ' disabled');
   btn.innerHTML = '<div class="icon">🧑‍🌾</div><div>指派村民耕作</div>';
   onTap(btn, () => {
@@ -3965,6 +4044,15 @@ function refreshActionButtons() {
         label.className = 'sectionLabel';
         label.textContent = '訓練單位';
         actionButtonsEl.appendChild(label);
+        if (human.currentPop() >= human.popCap) {
+          // 人口已滿時訓練按鈕還是能點、扣資源、排進佇列（跟大多數帝國遊戲一樣），
+          // 但排到的單位完工進度會卡在原地不動——沒有這行提示的話，玩家只會看到
+          // 「付了錢卻什麼也沒發生」，還以為是 bug。
+          const warn = document.createElement('div');
+          warn.className = 'sectionLabel popWarn';
+          warn.textContent = '⚠️ 人口已達上限，佇列中的單位不會完工，請先建造房屋';
+          actionButtonsEl.appendChild(warn);
+        }
         for (const slot of b.def.trains) {
           const isRoot = Object.prototype.hasOwnProperty.call(human.unitLine, slot);
           trainButton(actionButtonsEl, b, slot, isRoot);
@@ -4042,9 +4130,10 @@ function refreshSelectionInfo() {
       }
       if (e.def.isFarm) {
         extra += `<div>剩餘食物：${Math.ceil(e.foodLeft || 0)}</div>`;
-        extra += e.constructing
-          ? '<div>耕作狀態：自動施工中</div>'
-          : `<div>耕作狀態：${e.worker ? '有村民自動耕作中' : '尚未指派村民'}</div>`;
+        let farmStatus = '尚未指派村民';
+        if (e.constructing) farmStatus = '自動施工中';
+        else if (e.worker) farmStatus = e.workerArrived ? '有村民自動耕作中' : '村民正前往農田';
+        extra += `<div>耕作狀態：${farmStatus}</div>`;
       }
       if (e.def.relicDropOff) extra += `<div>存放聖物：${e.relicsHeld || 0} 個</div>`;
       if (e.def.isGate) extra += `<div>城門狀態：${e.open ? '開啟' : '關閉'}</div>`;
